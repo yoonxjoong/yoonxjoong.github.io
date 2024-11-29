@@ -1,6 +1,6 @@
 ---
 title: Enum 사용법
-description: 
+description: Enum 사용법
 author: yoonxjoong
 date: 2024-11-29 00:00:00 +0800
 categories: [JAVA]
