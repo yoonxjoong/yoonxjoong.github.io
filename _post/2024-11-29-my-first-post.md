@@ -2,12 +2,12 @@
 title: Enum 사용법
 description: Enum 사용법
 author: yoonxjoong
-date: 2024-11-29 00:00:00 +0800
+date: 2024-11-29 00:00:00 +0900
 categories: [JAVA]
 tags: [java]
-pin: true
-math: true
-mermaid: true
+#pin: true
+#math: true
+#mermaid: true
 ---
 
 이번 시간에는 Enum 클래스에 올바른 사용법에 대해서 공부해보겠습니다.
