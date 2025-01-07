@@ -3,7 +3,7 @@ title: Spring Boot의 @ComponentScan 이해하기
 description: Spring Boot 애플리케이션에서 @ComponentScan을 사용하여 빈(Bean)을 자동으로 스캔하고 관리하는 방법을 알아봅니다.
 author: yoonxjoong
 date: 2025-01-07 14:00:00 +0900
-categories: [Spring, Spring Boot]
+categories: [Spring BOOT]
 tags: [Spring Boot, ComponentScan, Java]
 ---
 # Spring Boot의 @ComponentScan 이해하기
