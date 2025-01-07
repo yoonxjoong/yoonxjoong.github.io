@@ -4,7 +4,7 @@ description: Spring Boot 애플리케이션에서 @ComponentScan을 사용하여
 author: yoonxjoong
 date: 2025-01-07 14:00:00 +0900
 categories: [Spring-Boot]
-tags: [Spring Boot, ComponentScan, Java]
+tags: [Spring Boot, ComponentScan]
 ---
 # Spring Boot의 @ComponentScan 이해하기
 
