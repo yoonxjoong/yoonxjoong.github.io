@@ -1,6 +1,6 @@
 ---
-title: 단방향 LinkedList 구현
-description: 단방향 LinkedList 구현
+title: Singly LinkedList 구현
+description: Singly LinkedList
 author: yoonxjoong
 date: 2025-02-04 14:00:00 +0900
 categories:

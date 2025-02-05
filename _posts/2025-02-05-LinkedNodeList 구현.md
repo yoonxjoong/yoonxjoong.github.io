@@ -1,6 +1,6 @@
 ---
-title: 단방향 LinkedList 구현
-description: 단방향 LinkedList 구현
+title: LinkedNodeList 구현
+description: LinkedNodeList 구현
 author: yoonxjoong
 date: 2025-02-05 14:00:00 +0900
 categories:
