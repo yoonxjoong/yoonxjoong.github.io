@@ -60,6 +60,8 @@ class Node {
     void recursive () {  
         Node nowNode = this;  
   
+  
+  
         while (nowNode.next != null) {  
             System.out.print(nowNode.data + " -> ");  
             nowNode = nowNode.next;  
