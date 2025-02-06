@@ -7,6 +7,7 @@ categories:
   - Algorithm
 tags:
   - java
+  - algorithm
 ---
 정렬되어 있지 않은 링크드리스트의 중복값을 제거하는 알고리즘을 구현해보았습니다.
 
