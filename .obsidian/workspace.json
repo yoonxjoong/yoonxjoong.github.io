@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "_posts/2025-02-05-ionic-1.md",
+                "file": "_posts/2025-02-06-LinkedNodeList 알고리즘 (1).md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "2025-02-05-ionic-1"
+              "title": "2025-02-06-LinkedNodeList 알고리즘 (1)"
             }
           }
         ]
@@ -77,8 +77,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300,
-    "collapsed": true
+    "width": 300
   },
   "right": {
     "id": "f6f8e041e5b50873",
@@ -161,9 +160,10 @@
   },
   "active": "9f4e1b7476d98aa9",
   "lastOpenFiles": [
-    "_posts/2025-02-05 LinkedNodeList 구현.md",
-    "_posts/2025-02-05-ionic-1.md",
     "_posts/2025-02-05-LinkedNodeList 구현.md",
+    "_posts/2025-02-06-LinkedNodeList 알고리즘 (1).md",
+    "_posts/2025-02-05-ionic-1.md",
+    "_posts/2025-02-05 LinkedNodeList 구현.md",
     "_posts/2025-02-04-Singly LinkedList 구현.md",
     "_posts/2025-02-04 Singly LinkedList 구현.md",
     "Untitled.canvas",
