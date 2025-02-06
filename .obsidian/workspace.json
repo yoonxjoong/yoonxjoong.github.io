@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "_posts/2025-02-06-LinkedNodeList 알고리즘 (1).md",
+                "file": "_posts/2025-02-06-LinkedNodeList 알고리즘.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "2025-02-06-LinkedNodeList 알고리즘 (1)"
+              "title": "2025-02-06-LinkedNodeList 알고리즘"
             }
           }
         ]
@@ -161,7 +161,7 @@
   "active": "9f4e1b7476d98aa9",
   "lastOpenFiles": [
     "_posts/2025-02-05-LinkedNodeList 구현.md",
-    "_posts/2025-02-06-LinkedNodeList 알고리즘 (1).md",
+    "_posts/2025-02-06-LinkedNodeList 알고리즘.md",
     "_posts/2024-11-29-my-first-post.md",
     "_posts/2024-12-10-aws-code-commit.md",
     "_posts/2024-12-26-ranking-architecture.md",
