@@ -16,7 +16,9 @@
                 "file": "_posts/2025-02-05-ionic-1.md",
                 "mode": "source",
                 "source": false
-              }
+              },
+              "icon": "lucide-file",
+              "title": "2025-02-05-ionic-1"
             }
           }
         ]
@@ -39,7 +41,9 @@
               "type": "file-explorer",
               "state": {
                 "sortOrder": "alphabetical"
-              }
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
             }
           },
           {
@@ -54,7 +58,9 @@
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical"
-              }
+              },
+              "icon": "lucide-search",
+              "title": "Search"
             }
           },
           {
@@ -62,14 +68,17 @@
             "type": "leaf",
             "state": {
               "type": "bookmarks",
-              "state": {}
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
             }
           }
         ]
       }
     ],
     "direction": "horizontal",
-    "width": 300
+    "width": 300,
+    "collapsed": true
   },
   "right": {
     "id": "f6f8e041e5b50873",
@@ -85,7 +94,6 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "_posts/2025-02-05-ionic-1.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -93,7 +101,9 @@
                 "searchQuery": "",
                 "backlinkCollapsed": false,
                 "unlinkedCollapsed": true
-              }
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks"
             }
           },
           {
@@ -102,10 +112,11 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "_posts/2025-02-05-ionic-1.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
-              }
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links"
             }
           },
           {
@@ -116,7 +127,9 @@
               "state": {
                 "sortOrder": "frequency",
                 "useHierarchy": true
-              }
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
             }
           },
           {
@@ -124,9 +137,9 @@
             "type": "leaf",
             "state": {
               "type": "outline",
-              "state": {
-                "file": "_posts/2025-02-05-ionic-1.md"
-              }
+              "state": {},
+              "icon": "lucide-list",
+              "title": "Outline"
             }
           }
         ]
@@ -148,16 +161,18 @@
   },
   "active": "9f4e1b7476d98aa9",
   "lastOpenFiles": [
-    "_posts/2025-02-05-LinkedNodeList 구현.md",
+    "_posts/2025-02-05 LinkedNodeList 구현.md",
     "_posts/2025-02-05-ionic-1.md",
-    "_posts/2025-01-07-component-scan.md",
-    "_posts/2024-11-29-my-first-post.md",
+    "_posts/2025-02-05-LinkedNodeList 구현.md",
     "_posts/2025-02-04-Singly LinkedList 구현.md",
+    "_posts/2025-02-04 Singly LinkedList 구현.md",
     "Untitled.canvas",
     "2025-01-23.md",
     "Untitled 1.canvas",
+    "_posts/2025-01-07-component-scan.md",
     "_posts/2024-12-26-ranking-architecture.md",
     "_posts/2024-12-10-aws-code-commit.md",
+    "_posts/2024-11-29-my-first-post.md",
     "_posts/2024-12-26-ranking-architecture 1.md",
     "assets/img/post/20241210/2024-12-10-1.png"
   ]
