@@ -1,5 +1,5 @@
 ---
-title: LinkedNodeList 알고리즘 (1)
+title: LinkedNodeList 알고리즘 (2)
 description: 정렬이 되어 있지 않은 링크드 리스트에 중복값을 제거 (버퍼를 사용하지 않고)
 author: yoonxjoong
 date: 2025-02-10 09:00:00 +0900
