@@ -1,6 +1,6 @@
 ---
 title: LinkedNodeList 알고리즘 (2)
-description: 정렬이 되어 있지 않은 링크드 리스트에 중복값을 제거 (버퍼를 사용하지 않고)
+description: 2개의 링크드 리스트의 제일 마지막 노드부터 합을 구하고 결과를 출력하는 알고리즘을 작성하시오.
 author: yoonxjoong
 date: 2025-02-10 09:00:00 +0900
 categories:
