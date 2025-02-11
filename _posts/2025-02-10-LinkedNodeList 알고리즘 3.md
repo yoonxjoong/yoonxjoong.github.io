@@ -1,6 +1,6 @@
 ---
 title: LinkedNodeList 알고리즘 (3)
-description: 정렬이 되어 있지 않은 링크드 리스트에 중복값을 제거 (버퍼를 사용하지 않고)
+description: 단방향 LinkedList 의 끝에서 k번쨰 노드를 찾는 알고리즘을 구현하시오
 author: yoonxjoong
 date: 2025-02-10 10:00:00 +0900
 categories:

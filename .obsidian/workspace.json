@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "_posts/2025-02-10-LinkedNodeList 알고리즘 3.md",
+                "file": "_posts/2025-02-10-LinkedNodeList 알고리즘 4.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "2025-02-10-LinkedNodeList 알고리즘 3"
+              "title": "2025-02-10-LinkedNodeList 알고리즘 4"
             }
           }
         ]
@@ -161,8 +161,9 @@
   },
   "active": "9f4e1b7476d98aa9",
   "lastOpenFiles": [
-    "_posts/2025-02-10-LinkedNodeList 알고리즘 2.md",
     "_posts/2025-02-10-LinkedNodeList 알고리즘 3.md",
+    "_posts/2025-02-10-LinkedNodeList 알고리즘 4.md",
+    "_posts/2025-02-10-LinkedNodeList 알고리즘 2.md",
     "_posts/2025-02-06-LinkedNodeList 알고리즘.md",
     "_posts/2025-02-05-LinkedNodeList 구현.md",
     "_posts/2025-02-05-ionic-1.md",
