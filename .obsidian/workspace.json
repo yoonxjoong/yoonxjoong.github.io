@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "_posts/2025-02-14-Stack 자료구조 구현.md",
+                "file": "_posts/2025-02-14-QUEUE 자료구조 구현.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "2025-02-14-Stack 자료구조 구현"
+              "title": "2025-02-14-QUEUE 자료구조 구현"
             }
           }
         ]
@@ -160,8 +160,9 @@
   },
   "active": "9f4e1b7476d98aa9",
   "lastOpenFiles": [
-    "_posts/2025-02-12-LinkedNodeList 알고리즘 5.md",
     "_posts/2025-02-14-Stack 자료구조 구현.md",
+    "_posts/2025-02-14-QUEUE 자료구조 구현.md",
+    "_posts/2025-02-12-LinkedNodeList 알고리즘 5.md",
     "_posts/2025-02-11-LinkedNodeList 알고리즘 4.md",
     "_posts/2025-02-10-LinkedNodeList 알고리즘 2.md",
     "_posts/2025-02-10-LinkedNodeList 알고리즘 3.md",
