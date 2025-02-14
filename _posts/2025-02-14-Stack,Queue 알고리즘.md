@@ -13,7 +13,8 @@ tags:
 - 새로운 스택에 데이터를 추가합니다.  
 - 큐를 구현하기 위해서 새로운 스택의 데이터를 백업 스택으로 뒤집어 쌓고 그 스택에 데이터를 peek 하거나 remove를 할 수 있습니다.  
 - peek를 하거나 remove를 하기전에 새로운 스택이 비워져 있다면 다시 쌓는 로직이 추가되어야 합니다.
-```java
+
+``` java
 class MyQueue<T> {  
   
     Stack<T> stackNewest;  
