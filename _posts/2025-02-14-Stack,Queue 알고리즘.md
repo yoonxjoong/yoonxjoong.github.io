@@ -1,5 +1,5 @@
 ---
-title: 2개의 스택을 이용해서 큐를 구현하시오.
+title: Stack,Queue 알고리즘 1
 description: 2개의 스택을 이용해서 큐를 구현하시오.
 author: yoonxjoong
 date: 2025-02-14 10:00:00 +0900
