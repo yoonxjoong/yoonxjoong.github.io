@@ -2,7 +2,7 @@
 title: Stack, Queue 알고리즘 3
 description: 자바에서 제공하는 LinkedList로 구현한 알고리즘 문제
 author: yoonxjoong
-date: 2025-02-14 10:00:00 +0900
+date: 2025-02-18 10:00:00 +0900
 categories:
   - Algorithm
 tags:

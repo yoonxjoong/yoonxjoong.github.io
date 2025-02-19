@@ -2,7 +2,7 @@
 title: Stack, Queue 알고리즘 2
 description: 정렬되지 않는 스택이 있습니다. 또다른 스택만을 이용해서 정렬을 하시오.
 author: yoonxjoong
-date: 2025-02-14 10:00:00 +0900
+date: 2025-02-17 10:00:00 +0900
 categories:
   - Algorithm
 tags:

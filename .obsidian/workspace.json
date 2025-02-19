@@ -27,12 +27,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "_posts/2025-02-18-Stack, Queue 알고리즘 3.md",
+                "file": "_posts/2025-02-19-트리 알고리즘.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "2025-02-18-Stack, Queue 알고리즘 3"
+              "title": "2025-02-19-트리 알고리즘"
             }
           }
         ],
@@ -176,9 +176,10 @@
   },
   "active": "d0b363f8fb0a1751",
   "lastOpenFiles": [
+    "_posts/2025-02-14-Stack,Queue 알고리즘.md",
     "_posts/2025-02-17-Stack, Queue 알고리즘 2.md",
     "_posts/2025-02-18-Stack, Queue 알고리즘 3.md",
-    "_posts/2025-02-14-Stack,Queue 알고리즘.md",
+    "_posts/2025-02-19-트리 알고리즘.md",
     "_posts/2025-02-14-Stack 자료구조 구현.md",
     "_posts/2025-02-14-Stack 자료구조 구현 1.md",
     "_posts/2025-02-14-QUEUE 자료구조 구현.md",
