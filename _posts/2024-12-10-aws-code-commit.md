@@ -3,8 +3,11 @@ title: AWS CodeCommit을 교체 자격 증명을 사용하여 연결하기
 description: IAM 사용자를 구성하거나 액세스 키를 사용하지 않고도 AWS CodeCommit 리포지토리에 접근하는 방법을 정리합니다.
 author: yoonxjoong
 date: 2024-12-10 14:00:00 +0900
-categories: [ AWS ]
-tags: [ AWS, CodeCommit ]
+categories:
+  - DevOps
+tags:
+  - AWS
+  - CodeCommit
 ---
 
 ## AWS CodeCommit이란?
