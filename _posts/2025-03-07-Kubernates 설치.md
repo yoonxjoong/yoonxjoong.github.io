@@ -74,35 +74,56 @@ systemct status ssh
 ```shell
 
 #!/bin/bash
-  
-set -e  # 오류 발생 시 스크립트 중단  
-  
-echo "🔹 기존 Kubernetes 저장소 및 GPG 키 삭제..."  
-sudo rm -f /etc/apt/sources.list.d/kubernetes.list  
-sudo rm -f /etc/apt/keyrings/kubernetes-archive-keyring.gpg  
-  
-echo "🔹 최신 Kubernetes GPG 키 추가..."  
-sudo mkdir -p /etc/apt/keyrings  
-curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.29/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-archive-keyring.gpg  
-  
-echo "🔹 Kubernetes 저장소 추가..."  
-echo "deb [signed-by=/etc/apt/keyrings/kubernetes-archive-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.29/deb/ /" | sudo tee /etc/apt/sources.list.d/kubernetes.list  
-  
-echo "🔹 패키지 목록 업데이트..."  
-sudo apt-get update  
-  
-echo "🔹 Kubernetes 패키지 설치 (kubectl, kubelet, kubeadm)..."  
-sudo apt-get install -y kubelet kubeadm kubectl  
-  
-echo "🔹 kubelet 서비스 활성화..."  
-sudo systemctl enable --now kubelet  
-  
-echo "🔹 설치된 Kubernetes 버전 확인..."  
-kubectl version --client  
-kubeadm version  
-kubelet --version  
 
-echo "✅ Kubernetes 설치 완료!"
+set -e  # 오류 발생 시 스크립트 중단
+
+# 1. 스왑 비활성화
+echo "스왑 비활성화 중..."
+sudo swapoff -a
+sudo sed -i '/ swap / s/^/#/' /etc/fstab
+
+# 2. Containerd 설치 및 설정
+echo "Containerd 설치 및 설정 중..."
+sudo apt-get update
+sudo apt-get install -y containerd
+sudo mkdir -p /etc/containerd
+containerd config default | sudo tee /etc/containerd/config.toml
+sudo sed -i 's/SystemdCgroup = false/SystemdCgroup = true/' /etc/containerd/config.toml
+sudo systemctl restart containerd
+sudo systemctl enable --now containerd
+
+# 3. Kubernetes 저장소 설정
+echo "Kubernetes 저장소 설정 중..."
+sudo rm -f /etc/apt/sources.list.d/kubernetes.list
+sudo rm -f /etc/apt/keyrings/kubernetes-archive-keyring.gpg
+sudo mkdir -p /etc/apt/keyrings
+curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.29/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-archive-keyring.gpg
+echo "deb [signed-by=/etc/apt/keyrings/kubernetes-archive-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.29/deb/ /" | sudo tee /etc/apt/sources.list.d/kubernetes.list
+
+echo "패키지 목록 업데이트 중..."
+sudo apt-get update
+
+# 4. Kubernetes 패키지 설치 (kubelet, kubeadm, kubectl)
+echo "Kubernetes 패키지 설치 중..."
+sudo apt-get install -y kubelet kubeadm kubectl
+sudo systemctl enable --now kubelet
+
+# 5. 클러스터 초기화 (마스터 IP 및 Pod 네트워크 CIDR 지정)
+echo "Kubernetes 마스터 초기화 중..."
+sudo kubeadm init --apiserver-advertise-address=192.168.64.100 --pod-network-cidr=192.168.64.0/16
+
+# 6. kubeconfig 설정 (일반 사용자 환경에 복사)
+echo "사용자 kubeconfig 설정 중..."
+mkdir -p $HOME/.kube
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+# 7. CNI 플러그인(Flannel) 설치
+echo "네트워크 플러그인(Flannel) 설치 중..."
+kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+
+echo "Kubernetes 마스터 설치 완료!"
+echo "마스터 노드는 준비되었으며, 'kubectl get nodes'로 상태를 확인하세요."
 
 ```
 
