@@ -63,15 +63,17 @@ sudo systemctl enable --now ssh
 
 - SSH 상태 확인
 ``` bash
-systemct. status ssh
+systemct status ssh
 ```
 
 
 
 #### 3. kubelet,  kubectl, kubeadm 설치
 - 설치 스크립트 작성 (install_kubernetes.sh)
-``` shell
-#!/bin/bash  
+
+```shell
+
+#!/bin/bash
   
 set -e  # 오류 발생 시 스크립트 중단  
   
@@ -101,7 +103,9 @@ kubeadm version
 kubelet --version  
 
 echo "✅ Kubernetes 설치 완료!"
+
 ```
+
 
 - 스크립트 실행 권한 부여
 ``` shell
