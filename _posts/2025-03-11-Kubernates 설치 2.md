@@ -1,6 +1,6 @@
 ---
-title: Kubernates 테스트 환경 설치 가이드 (2)
-description: Kubernates 테스트 환경 설치 가이드 (2)
+title: kubernetes 테스트 환경 설치 가이드 (2)
+description: kubernetes 테스트 환경 설치 가이드 (2)
 author: yoonxjoong
 date: 2025-03-11 10:00:00 +0900
 categories:
