@@ -1,6 +1,6 @@
 ---
-title: kubernetes 테스트 환경 설치 가이드 (2)
-description: kubernetes 테스트 환경 설치 가이드 (2)
+title: Kubernates Secret
+description: Kubernates Secret를 생성하고 환경변수로 주입하는 실습
 author: yoonxjoong
 date: 2025-03-11 17:00:00 +0900
 categories:
