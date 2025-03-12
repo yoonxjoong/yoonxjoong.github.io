@@ -128,9 +128,21 @@ sudo systemctl enable --now kubelet
 
 echo "============================"
 echo " Kubernetes 워커(노드) 설치 완료!"
-echo "마스터 노드에서 생성된 'kubeadm join' 명령어를 사용하여 클러스터에 조인하세요."
-echo "예:"
-echo "  sudo kubeadm join 192.168.64.100:6443 --token <your-token> --discovery-token-ca-cert-hash sha256:<your-hash>"
+echo "============================"
+
+# 인자가 3개이면 자동으로 클러스터에 조인, 그렇지 않으면 조인 명령어 안내 출력
+if [ "$#" -eq 3 ]; then
+    MASTER_IP="$1"
+    TOKEN="$2"
+    DISCOVERY_HASH="$3"
+    echo "클러스터에 자동으로 조인합니다:"
+    echo "  sudo kubeadm join ${MASTER_IP}:6443 --token ${TOKEN} --discovery-token-ca-cert-hash sha256:${DISCOVERY_HASH}"
+    sudo kubeadm join ${MASTER_IP}:6443 --token ${TOKEN} --discovery-token-ca-cert-hash sha256:${DISCOVERY_HASH}
+else
+    echo "마스터 노드에서 생성된 'kubeadm join' 명령어를 사용하여 클러스터에 조인하세요."
+    echo "예:"
+    echo "  sudo kubeadm join 192.168.64.100:6443 --token <your-token> --discovery-token-ca-cert-hash sha256:<your-hash>"
+fi
 
 ```
 

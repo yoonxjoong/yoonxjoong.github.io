@@ -71,19 +71,26 @@ systemct status ssh
 #### 3. kubelet,  kubectl, kubeadm 설치
 - 설치 스크립트 작성 (install_kubernetes.sh)
 
-```shell
-
+``` shell
 #!/bin/bash
+set -e
 
-set -e  # 오류 발생 시 스크립트 중단
+echo "============================"
+echo " 기존 Kubernetes 설정 초기화"
+echo "============================"
+sudo kubeadm reset -f || true
+sudo systemctl stop kubelet
+sudo rm -rf /etc/kubernetes /var/lib/kubelet /etc/cni /opt/cni
 
-# 1. 스왑 비활성화
-echo "스왑 비활성화 중..."
+echo "============================"
+echo " 스왑 비활성화"
+echo "============================"
 sudo swapoff -a
 sudo sed -i '/ swap / s/^/#/' /etc/fstab
 
-# 2. Containerd 설치 및 설정
-echo "Containerd 설치 및 설정 중..."
+echo "============================"
+echo " Containerd 설치 및 설정"
+echo "============================"
 sudo apt-get update
 sudo apt-get install -y containerd
 sudo mkdir -p /etc/containerd
@@ -92,38 +99,43 @@ sudo sed -i 's/SystemdCgroup = false/SystemdCgroup = true/' /etc/containerd/conf
 sudo systemctl restart containerd
 sudo systemctl enable --now containerd
 
-# 3. Kubernetes 저장소 설정
-echo "Kubernetes 저장소 설정 중..."
+echo "============================"
+echo " Kubernetes 저장소 설정"
+echo "============================"
 sudo rm -f /etc/apt/sources.list.d/kubernetes.list
 sudo rm -f /etc/apt/keyrings/kubernetes-archive-keyring.gpg
 sudo mkdir -p /etc/apt/keyrings
 curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.29/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-archive-keyring.gpg
 echo "deb [signed-by=/etc/apt/keyrings/kubernetes-archive-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.29/deb/ /" | sudo tee /etc/apt/sources.list.d/kubernetes.list
 
-echo "패키지 목록 업데이트 중..."
+echo "============================"
+echo " 패키지 목록 업데이트 및 Kubernetes 패키지 설치"
+echo "============================"
 sudo apt-get update
-
-# 4. Kubernetes 패키지 설치 (kubelet, kubeadm, kubectl)
-echo "Kubernetes 패키지 설치 중..."
 sudo apt-get install -y kubelet kubeadm kubectl
 sudo systemctl enable --now kubelet
 
-# 5. 클러스터 초기화 (마스터 IP 및 Pod 네트워크 CIDR 지정)
-echo "Kubernetes 마스터 초기화 중..."
-sudo kubeadm init --apiserver-advertise-address=192.168.64.100 --pod-network-cidr=192.168.64.0/16
+echo "============================"
+echo " Kubernetes 마스터 초기화"
+echo "============================"
+# Calico 기본 pod 네트워크 CIDR(192.168.0.0/16) 사용
+sudo kubeadm init --apiserver-advertise-address=192.168.64.100 --pod-network-cidr=192.168.0.0/16
 
-# 6. kubeconfig 설정 (일반 사용자 환경에 복사)
-echo "사용자 kubeconfig 설정 중..."
+echo "============================"
+echo " kubeconfig 설정 (사용자 환경)"
+echo "============================"
 mkdir -p $HOME/.kube
 sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
 sudo chown $(id -u):$(id -g) $HOME/.kube/config
 
-# 7. CNI 플러그인(Flannel) 설치
-echo "네트워크 플러그인(Flannel) 설치 중..."
-kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+echo "============================"
+echo " CNI 플러그인(Calico) 설치"
+echo "============================"
+kubectl apply -f https://docs.projectcalico.org/manifests/calico.yaml
 
-echo "Kubernetes 마스터 설치 완료!"
-echo "마스터 노드는 준비되었으며, 'kubectl get nodes'로 상태를 확인하세요."
+echo "============================"
+echo " Kubernetes 마스터 설치 완료!"
+echo " 'kubectl get nodes' 명령어로 상태를 확인하세요."
 
 ```
 
