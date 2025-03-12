@@ -2,7 +2,7 @@
 title: Kubernates Secret
 description: Kubernates Secret를 생성하고 환경변수로 주입하는 실습
 author: yoonxjoong
-date: 2025-03-11 17:00:00 +0900
+date: 2025-03-12 09:00:00 +0900
 categories:
   - DevOps
 tags:
