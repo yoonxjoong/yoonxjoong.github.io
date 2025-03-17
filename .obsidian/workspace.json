@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "_posts/2025-03-11-Kubernates 설치 2.md",
+                "file": "_posts/2025-03-17-TroubleShooting-1.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "2025-03-11-Kubernates 설치 2"
+              "title": "2025-03-17-TroubleShooting-1"
             }
           }
         ]
@@ -53,7 +53,7 @@
             "state": {
               "type": "search",
               "state": {
-                "query": "",
+                "query": "tag:Kubeadm",
                 "matchingCase": false,
                 "explainSearch": false,
                 "collapseAll": false,
@@ -74,11 +74,13 @@
               "title": "Bookmarks"
             }
           }
-        ]
+        ],
+        "currentTab": 1
       }
     ],
     "direction": "horizontal",
-    "width": 373.5
+    "width": 373.5,
+    "collapsed": true
   },
   "right": {
     "id": "f6f8e041e5b50873",
@@ -161,9 +163,11 @@
   },
   "active": "1a113313c7453d9e",
   "lastOpenFiles": [
-    "_posts/2025-03-07-Kubernates 설치.md",
     "_posts/2025-03-12-Kubernates Secret.md",
+    "_posts/2025-03-17-TroubleShooting-1.md",
     "_posts/2025-03-11-Kubernates 설치 2.md",
+    "Untitled.md",
+    "_posts/2025-03-07-Kubernates 설치.md",
     "_posts/2025-03-10-DFS,BFS 알고리즘 2.md",
     "_posts/2025-03-05-DFS,BFS 알고리즘.md",
     "_posts/2025-02-18-Stack, Queue 알고리즘 3.md",
@@ -185,8 +189,6 @@
     "_posts/2025-02-17-Stack, Queue 알고리즘 2.md",
     "_posts/2025-02-14-Stack 자료구조 구현 1.md",
     "_posts/2025-02-14-QUEUE 자료구조 구현.md",
-    "_posts/2025-02-11-LinkedNodeList 알고리즘 4.md",
-    "_posts/2025-02-05-LinkedNodeList 구현.md",
     "Untitled.canvas",
     "Untitled 1.canvas",
     "assets/img/post/20241210/2024-12-10-1.png"
