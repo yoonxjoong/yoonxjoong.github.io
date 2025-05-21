@@ -4,7 +4,7 @@ description:
 author: yoonxjoong
 date: 2025-05-21 09:00:00 +0900
 categories:
-  - CleanCode
+  - Software Design
 tags:
 ---
 개발을 하다 보면 `new` 키워드 말고도 `List.of()`, `Optional.of()`, `Integer.valueOf()` 같은 익숙한 메서드들을 보신 적 있을 거예요. 뭔가 객체를 생성하는 것 같은데, 왜 굳이 `of` 같은 형태로 만들어서 사용하는 걸까요? 
