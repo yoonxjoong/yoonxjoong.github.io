@@ -4,21 +4,19 @@
     "type": "split",
     "children": [
       {
-        "id": "1addcbe22112895a",
+        "id": "e5a6fc522b75c4fa",
         "type": "tabs",
         "children": [
           {
-            "id": "fbb398ba5ff2b926",
+            "id": "948daa314093d47d",
             "type": "leaf",
             "state": {
-              "type": "markdown",
+              "type": "image",
               "state": {
-                "file": "_posts/2025-06-25-OutBox-pattern 1.md",
-                "mode": "source",
-                "source": false
+                "file": "Pasted image 20250804163749.png"
               },
-              "icon": "lucide-file",
-              "title": "2025-06-25-OutBox-pattern 1"
+              "icon": "lucide-image",
+              "title": "Pasted image 20250804163749"
             }
           }
         ]
@@ -159,11 +157,19 @@
       "command-palette:Open command palette": false
     }
   },
-  "active": "fbb398ba5ff2b926",
+  "active": "948daa314093d47d",
   "lastOpenFiles": [
-    "_posts/2025-06-19-OutBox-pattern.md",
-    "_posts/2025-06-25-OutBox-pattern 1.md",
     "Pasted image 20250620110131.png",
+    "Pasted image 20250804162437.png",
+    "Pasted image 20250804162802.png",
+    "Pasted image 20250804162533.png",
+    "Pasted image 20250407133319.png",
+    "_posts/2025-07-28-feature-paycoin-1.md",
+    "Pasted image 20250804163749.png",
+    "_posts/2025-07-29-code-algorithm-Climbing Stairs.md",
+    "_posts/2025-06-25-OutBox-pattern 2.md",
+    "_posts/2025-06-25-OutBox-pattern 1.md",
+    "_posts/2025-06-19-OutBox-pattern.md",
     "_posts/2025-06-11-loading.md",
     "Pasted image 20250620103259.png",
     "_posts/2025-06-16-MSA-1.md",
@@ -190,9 +196,6 @@
     "assets/img/favicons/mstile-150x150.png",
     "assets/img/favicons/favicon-32x32.png",
     "assets/img/favicons/favicon-16x16.png",
-    "assets/img/favicons/apple-touch-icon.png",
-    "assets/img/favicons/android-chrome-512x512.png",
-    "assets/img/favicons/android-chrome-192x192.png",
     "_tabs/tags.md",
     "_tabs/categories.md",
     "_tabs/archives.md",
@@ -202,12 +205,7 @@
     "_posts/2025-03-12-Kubernates Secret.md",
     "_posts/2025-03-11-Kubernates 설치 2.md",
     "_posts/2025-03-10-DFS,BFS 알고리즘 2.md",
-    "_posts/2025-03-07-Kubernates 설치.md",
-    "_posts/2025-03-05-DFS,BFS 알고리즘.md",
-    "_posts/2025-02-27-Git Branch 전략.md",
-    "_posts/2025-02-25-트라이 트리.md",
     "Untitled.canvas",
-    "Pasted image 20250407133319.png",
     "Untitled 1.canvas"
   ]
 }
