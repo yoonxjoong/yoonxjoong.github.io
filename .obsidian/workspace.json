@@ -4,19 +4,21 @@
     "type": "split",
     "children": [
       {
-        "id": "e5a6fc522b75c4fa",
+        "id": "835f45996e64931a",
         "type": "tabs",
         "children": [
           {
-            "id": "948daa314093d47d",
+            "id": "23a181a5a195932d",
             "type": "leaf",
             "state": {
-              "type": "image",
+              "type": "markdown",
               "state": {
-                "file": "Pasted image 20250804163749.png"
+                "file": "_posts/2025-08-04-feature-paycoin-1.md",
+                "mode": "source",
+                "source": false
               },
-              "icon": "lucide-image",
-              "title": "Pasted image 20250804163749"
+              "icon": "lucide-file",
+              "title": "2025-08-04-feature-paycoin-1"
             }
           }
         ]
@@ -157,16 +159,21 @@
       "command-palette:Open command palette": false
     }
   },
-  "active": "948daa314093d47d",
+  "active": "23a181a5a195932d",
   "lastOpenFiles": [
+    "_posts/2024-12-10-aws-code-commit.md",
+    "_posts/2025-08-04-feature-paycoin-1.md",
+    "assets/img/post/20250804163749.png",
+    "assets/img/post/20241210/2024-12-10-1.png",
+    "img/Pasted.md",
+    "img",
+    "_posts/2025-07-29-code-algorithm-Climbing Stairs.md",
+    "_img",
     "Pasted image 20250620110131.png",
     "Pasted image 20250804162437.png",
     "Pasted image 20250804162802.png",
     "Pasted image 20250804162533.png",
     "Pasted image 20250407133319.png",
-    "_posts/2025-07-28-feature-paycoin-1.md",
-    "Pasted image 20250804163749.png",
-    "_posts/2025-07-29-code-algorithm-Climbing Stairs.md",
     "_posts/2025-06-25-OutBox-pattern 2.md",
     "_posts/2025-06-25-OutBox-pattern 1.md",
     "_posts/2025-06-19-OutBox-pattern.md",
@@ -190,12 +197,8 @@
     "docs/CONTRIBUTING.md",
     "docs/CODE_OF_CONDUCT.md",
     "docs/CHANGELOG.md",
-    "docs",
-    "docker-compose.yml",
-    "assets/img/post/20241210/2024-12-10-1.png",
     "assets/img/favicons/mstile-150x150.png",
     "assets/img/favicons/favicon-32x32.png",
-    "assets/img/favicons/favicon-16x16.png",
     "_tabs/tags.md",
     "_tabs/categories.md",
     "_tabs/archives.md",
@@ -204,7 +207,6 @@
     "_posts/2025-03-17-TroubleShooting-1.md",
     "_posts/2025-03-12-Kubernates Secret.md",
     "_posts/2025-03-11-Kubernates 설치 2.md",
-    "_posts/2025-03-10-DFS,BFS 알고리즘 2.md",
     "Untitled.canvas",
     "Untitled 1.canvas"
   ]
