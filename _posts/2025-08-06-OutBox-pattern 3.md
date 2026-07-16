@@ -4,7 +4,8 @@ description:
 author: yoonxjoong
 date: 2025-08-06 09:00:00 +0900
 categories:
-  - Software Design
+  - Backend
+  - MSA
 tags:
 ---
 ## 아웃박스 패턴 프로젝트 (Day 3): 아웃박스 이벤트, Kafka로 발행하기!

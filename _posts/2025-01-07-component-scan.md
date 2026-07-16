@@ -4,7 +4,8 @@ description: Spring Boot 애플리케이션에서 @ComponentScan을 사용하여
 author: yoonxjoong
 date: 2025-01-07 14:00:00 +0900
 categories:
-  - JAVA
+  - Backend
+  - Spring
 tags:
   - Spring
   - Boot

@@ -4,7 +4,8 @@ description:
 author: yoonxjoong
 date: 2025-08-04 09:00:00 +0900
 categories:
-  - ARCHITECTURE
+  - Backend
+  - Spring
 tags:
 ---
 안녕하세요!

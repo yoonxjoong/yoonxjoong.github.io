@@ -4,7 +4,8 @@ description:
 author: yoonxjoong
 date: 2025-06-19 09:00:00 +0900
 categories:
-  - Software Design
+  - Backend
+  - MSA
 tags:
 ---
 ## 데이터 유실없이 이벤트 발행하기 : MSA 방식의 아웃박스 패턴!

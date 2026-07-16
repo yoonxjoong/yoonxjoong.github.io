@@ -3,7 +3,9 @@ title: Enum 사용법
 description: Enum 사용법
 author: yoonxjoong
 date: 2024-11-29 00:00:00 +0900
-categories: [JAVA]
+categories:
+  - Backend
+  - Spring
 tags: [java]
 #pin: true
 #math: true

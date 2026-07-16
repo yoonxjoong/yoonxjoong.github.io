@@ -5,6 +5,7 @@ author: yoonxjoong
 date: 2025-02-18 10:00:00 +0900
 categories:
   - Algorithm
+  - Stack-Queue
 tags:
   - java
   - algorithm

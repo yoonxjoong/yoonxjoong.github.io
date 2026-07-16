@@ -4,7 +4,8 @@ description:
 author: yoonxjoong
 date: 2025-06-02 09:00:00 +0900
 categories:
-  - Software Design
+  - Backend
+  - Database
 tags:
 ---
 자바 전형 백엔드 개발자에서 ORM 프레임워크인 JPA (Java Persistence API) 를 사용한다면, EntityManager라는 이름을 수도 없이 마주치셨을겁니다. 제가 지금 하고 있는 프로젝트는 Mybatis기반으로 JPA 를 사용하지 않지만요

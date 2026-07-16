@@ -4,7 +4,8 @@ description:
 author: yoonxjoong
 date: 2025-06-25 09:00:00 +0900
 categories:
-  - Software Design
+  - Backend
+  - MSA
 tags:
 ---
 안녕하세요! 지난번에는 **아웃박스 패턴**을 활용하여 데이터 유실 없는 이벤트 기반 아키텍처를 구축하는 프로젝트의 전체적인 그림을 그려봤었죠. 오늘은 그 대장정의 첫걸음, **Day 1: 기본 프로젝트 구조 설정 및 도메인 모델링**을 함께 진행해 보겠습니다.

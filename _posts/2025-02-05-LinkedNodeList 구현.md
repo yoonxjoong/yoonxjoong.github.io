@@ -5,6 +5,7 @@ author: yoonxjoong
 date: 2025-02-05 14:00:00 +0900
 categories:
   - Algorithm
+  - LinkedList
 tags:
   - java
 ---

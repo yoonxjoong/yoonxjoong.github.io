@@ -5,6 +5,7 @@ author: yoonxjoong
 date: 2025-03-12 09:00:00 +0900
 categories:
   - DevOps
+  - Kubernetes
 tags:
   - Kubernates
   - Kubeadm

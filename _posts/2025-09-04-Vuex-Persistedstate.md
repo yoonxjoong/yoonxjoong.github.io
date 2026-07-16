@@ -4,7 +4,7 @@ description: "- 상황 - 경과(시도했던 것들) - 원인 - 조치 - 결과 
 author: yoonxjoong
 date: 2025-09-04 09:00:00 +0900
 categories:
-  - TroubleShooting
+  - Troubleshooting
 tags:
 ---
 안녕하세요. 현업에서 결제 모듈을 연동하는 업무를 담당하여 개발하고 있는 중에 트러블 슈팅에 대해 정리해보는 시간을 가져 보겠습니다.
