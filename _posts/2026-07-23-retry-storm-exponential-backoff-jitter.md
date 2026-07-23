@@ -1,6 +1,6 @@
 ---
 title: "재시도(Retry)가 오히려 장애를 키우는 순간 — Retry Storm과 Exponential Backoff + Jitter"
-description: 평소 초당 1000건을 받던 서버가 느려지기 시작하면 무슨 일이 벌어질까요. 타임아웃, 재시도, 그리고 그 재시도가 서버를 더 죽이는 악순환에 대한 학습 노트입니다.
+description: 평소 초당 1000건을 받던 서버가 느려지기 시작하면 무슨 일이 벌어질까요. 타임아웃, 재시도, 그리고 그 재시도가 서버를 더 죽이는 악순환에 대한 학습 노트입니다. Retry Storm을 실제로 재현해서 naive 재시도와 Exponential Backoff+Jitter를 숫자로 비교했습니다.
 author: yoonxjoong
 date: 2026-07-23 10:00:00 +0900
 categories:
@@ -14,7 +14,7 @@ tags:
 mermaid: true
 ---
 
-> [ecommerce-msa](https://github.com/yoonxjoong/ecommerce-msa)에 Circuit Breaker를 붙이면서, "재시도는 언제, 어떻게 해야 안전한가"라는 질문이 자연스럽게 따라왔습니다. 이 글은 아직 코드로 옮기기 전 단계의 **개념 정리(학습 노트)**입니다 — Idempotency Key처럼 이미 구현·검증한 부분과 섞이지 않게, 이 글에 나오는 코드는 전부 "이렇게 붙일 수 있다"는 설계 스케치라는 걸 미리 밝혀둡니다.
+> [ecommerce-msa](https://github.com/yoonxjoong/ecommerce-msa)에 Circuit Breaker를 붙이면서, "재시도는 언제, 어떻게 해야 안전한가"라는 질문이 자연스럽게 따라왔습니다. 개념만 정리하고 끝내기보다, **Retry Storm을 실제로 재현해서 naive 재시도와 Exponential Backoff+Jitter를 숫자로 비교**해봤습니다 — [retry-storm-lab](https://github.com/yoonxjoong/retry-storm-lab)이라는 별도 저장소입니다 (`ecommerce-msa`와는 관심사가 달라서, 그리고 부하 테스트 특성상 메모리를 많이 쓸 수 있어서 분리했습니다). 다만 이 재시도를 `ecommerce-msa`의 실제 서비스 호출(`order-service → payment-service`)에 붙이는 것까지는 아직 안 했습니다 — 아래 코드는 여전히 "이렇게 붙일 수 있다"는 설계 스케치입니다.
 
 ## 이런 상황을 상상해보세요
 
@@ -98,6 +98,31 @@ if (existing.isPresent()) {
 
 핵심 통찰은 이겁니다 — **"무작위성을 더해서 시스템 성능을 개선한다"는 게 직관적이진 않지만, 클라이언트들의 재시도 타이밍을 서로 어긋나게(decorrelate) 만드는 게 목적**입니다. 다 같이 정해진 타이밍에 몰리는 것 자체가 문제였으니까요.
 
+## 말로만 하지 않고 실제로 재현해봤습니다
+
+이 주장(naive 재시도는 부하를 늘리고, Backoff+Jitter는 줄인다)이 진짜인지 [retry-storm-lab](https://github.com/yoonxjoong/retry-storm-lab)이라는 작은 프로젝트로 직접 확인해봤습니다. 구조는 단순합니다.
+
+- **flaky-server**: 진짜 "용량"이 있는 서버. Tomcat 스레드 풀을 10개로 제한하고, 요청 하나당 200ms가 고정으로 걸리게 해뒀습니다. 이론상 최대 처리량은 초당 50건 정도입니다.
+- **retry-client**: 가상 사용자 50명이 동시에 이 서버를 두드립니다(사용자당 5건, 총 논리적 요청 250건). 재시도 전략만 `none` / `naive`(거의 즉시 재시도) / `backoff-jitter`(Resilience4j `IntervalFunction.ofExponentialRandomBackoff`)로 바꿔가며 같은 부하를 걸었습니다.
+
+```mermaid
+graph LR
+    U[가상 사용자 50명] -->|동시 요청| S[flaky-server<br/>용량 10, 큐 20]
+    S -->|타임아웃/거부| U
+```
+
+같은 부하, 같은 최대 시도 횟수(5회)로 세 전략을 그대로 돌린 결과입니다.
+
+| 전략 | 서버로 나간 총 요청(재시도 포함) | 성공률 | 소요 시간 |
+| --- | --- | --- | --- |
+| `none` (재시도 없음) | 250건 | 18.8% (47/250) | 5.1초 |
+| `naive` (즉시 재시도) | 625건 | 75.6% (189/250) | 13.0초 |
+| `backoff-jitter` | 356건 | **100.0%** (250/250) | 7.6초 |
+
+`naive`가 `none`보다 성공률은 높였지만, 그 대가로 **서버에 2.5배 많은 요청을 쏟아부었고 시간도 제일 오래 걸렸습니다** — 서버가 계속 포화 상태 근처에 머물러 있었다는 신호입니다. `backoff-jitter`는 `naive`보다 적은 요청으로 100% 성공했고, 더 빨리 끝났습니다. 재시도 간격이 벌어지고 흩어지는 동안 서버가 밀린 요청을 처리할 틈이 생긴 것으로 보입니다.
+
+설계 단계에서 주장했던 걸 숫자로 확인한 셈입니다.
+
 ## Retry와 Circuit Breaker는 같이 다닌다
 
 이 글을 쓰게 된 계기가 Circuit Breaker였는데, 사실 이 둘은 따로 노는 개념이 아닙니다.
@@ -132,11 +157,12 @@ Retry ( CircuitBreaker ( RateLimiter ( TimeLimiter ( Bulkhead ( 실제 호출 ) 
 
 ## 한계 및 남는 궁금증
 
-- 이 글에 나온 내용은 전부 설계 단계입니다. `ecommerce-msa`에 실제로 `@Retry`를 붙이고, 일부러 payment-service 응답을 느리게 만들어서 재시도가 도는 걸 로그로 확인하는 것까지는 아직 안 해봤습니다.
-- Jitter 전략 세 가지(Full/Equal/Decorrelated) 중 실제로 어떤 게 우리 트래픽 패턴에 맞을지는 트래픽을 실제로 흘려보기 전엔 알기 어려울 것 같습니다.
-- 재시도 총 횟수, 최대 대기 시간 상한 같은 값도 다 감으로 잡아야 하는 부분이라, 이것도 결국 [Circuit Breaker 글](/posts/ecommerce-architecture/)에서 짚었던 "실측 없이 정한 기본값" 문제와 똑같이 남아있습니다.
+- `retry-storm-lab`으로 Retry Storm 재현과 Backoff+Jitter의 효과는 실제로 검증했지만, 이걸 `ecommerce-msa`의 실제 서비스 호출(`order-service → payment-service`)에 붙이는 건 아직 안 했습니다. `inventory-service`의 재고 차감에 멱등키를 먼저 도입하는 것도 마찬가지로 남아있습니다.
+- `backoff-jitter`가 100% 성공한 건 이번 부하 조건(가상 사용자 50명, 최대 시도 5회)에서의 결과입니다. 부하가 더 크거나 서버 용량이 더 작았다면 5번의 재시도로도 부족했을 수 있어서, "얼마나 재시도하면 충분한지"는 여전히 트래픽 패턴에 달린 문제입니다.
+- AWS 블로그의 Jitter 전략 세 가지(Full/Equal/Decorrelated)를 각각 정확히 구현해서 비교한 건 아니고, Resilience4j가 기본 제공하는 `IntervalFunction.ofExponentialRandomBackoff`(자체 랜덤화 공식) 하나만 써봤습니다. 이게 세 전략 중 어디에 가장 가까운지, 서로 실제로 얼마나 차이 나는지는 다음에 직접 비교해보고 싶습니다.
+- 재시도 총 횟수, 최대 대기 시간 상한 같은 값도 다 감으로 잡은 부분이라, 이것도 결국 [Circuit Breaker 글](/posts/ecommerce-architecture/)에서 짚었던 "실측 없이 정한 기본값" 문제와 똑같이 남아있습니다.
 
-기회가 되면 `inventory-service`의 재고 차감 호출에 멱등키를 먼저 붙이고, 그 위에 Retry + Circuit Breaker를 실제로 얹어서 Retry Storm이 억제되는 걸 직접 확인해보고 싶습니다.
+기회가 되면 `inventory-service`의 재고 차감 호출에 멱등키를 먼저 붙이고, 그 위에 Retry + Circuit Breaker를 `ecommerce-msa`에 실제로 얹어서 Retry Storm이 억제되는 걸 직접 확인해보고 싶습니다.
 
 ## 참고 자료
 
