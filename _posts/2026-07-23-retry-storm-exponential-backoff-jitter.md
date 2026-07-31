@@ -157,7 +157,6 @@ Retry ( CircuitBreaker ( RateLimiter ( TimeLimiter ( Bulkhead ( 실제 호출 ) 
 
 ## 한계 및 남는 궁금증
 
-- `@CircuitBreaker`와 `@Retry`를 같이 쓸 때 fallback을 어디에 둬야 하는지가 위에서 겪은 것처럼 직관적이지 않습니다. [circuit-breaker-lab](https://github.com/yoonxjoong/circuit-breaker-lab)에서 이 문제를 재현 가능한 형태로 만들어뒀는데, 아직 직접 돌려서 실측 숫자를 확인하진 않았습니다.
 - `backoff-jitter`가 100% 성공한 건 이번 부하 조건(가상 사용자 50명, 최대 시도 5회)에서의 결과입니다. 부하가 더 크거나 서버 용량이 더 작았다면 5번의 재시도로도 부족했을 수 있어서, "얼마나 재시도하면 충분한지"는 여전히 트래픽 패턴에 달린 문제입니다.
 - AWS 블로그의 Jitter 전략 세 가지(Full/Equal/Decorrelated)를 각각 정확히 구현해서 비교한 건 아니고, Resilience4j가 기본 제공하는 `IntervalFunction.ofExponentialRandomBackoff`(자체 랜덤화 공식) 하나만 써봤습니다. 이게 세 전략 중 어디에 가장 가까운지, 서로 실제로 얼마나 차이 나는지는 다음에 직접 비교해보고 싶습니다.
 - 재시도 총 횟수, 최대 대기 시간 상한 같은 값도 다 감으로 잡은 부분이라, 이것도 결국 [Circuit Breaker 글](/posts/ecommerce-architecture/)에서 짚었던 "실측 없이 정한 기본값" 문제와 똑같이 남아있습니다.
