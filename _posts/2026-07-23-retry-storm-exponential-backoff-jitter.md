@@ -70,7 +70,7 @@ if (existing.isPresent()) {
 }
 ```
 
-반대로 `inventory-service`의 재고 차감(`DECRBY`)은 **멱등하지 않습니다** — 같은 요청을 두 번 보내면 진짜로 두 번 차감됩니다. 그러니까 "여기에 재시도를 걸어도 될까?"라는 질문의 답은 **"먼저 멱등하게 만들지 않으면 안 된다"**입니다. 재시도는 이미 멱등한 연산 위에나 안전하게 얹을 수 있는 거지, 아무 호출에나 붙일 수 있는 만능 장치가 아닙니다.
+반대로 `inventory-service`의 재고 차감(`DECRBY`)은 이 글을 쓴 시점엔 **멱등하지 않았습니다** — 같은 요청을 두 번 보내면 진짜로 두 번 차감됐습니다. 그러니까 "여기에 재시도를 걸어도 될까?"라는 질문의 답은 **"먼저 멱등하게 만들지 않으면 안 된다"**였습니다. 재시도는 이미 멱등한 연산 위에나 안전하게 얹을 수 있는 거지, 아무 호출에나 붙일 수 있는 만능 장치가 아닙니다. (**업데이트**: 이후 실제로 멱등키를 도입했습니다 — 아래 "그래서 이걸 어디에 붙이면 좋을까" 참고.)
 
 ## Exponential Backoff — 간격을 벌리기
 
@@ -152,17 +152,17 @@ Retry ( CircuitBreaker ( RateLimiter ( TimeLimiter ( Bulkhead ( 실제 호출 ) 
 
 [ecommerce-msa](https://github.com/yoonxjoong/ecommerce-msa) 기준으로 정리해보면:
 
-- **`order-service → payment-service` 호출**: 좋은 후보입니다. 이미 Idempotency Key로 멱등성이 보장돼 있고, Circuit Breaker도 이미 붙어있어서 `@Retry` 어노테이션 하나만 추가하면 됩니다 (실제로 감싸는 순서는 Resilience4j가 알아서 `Retry(CircuitBreaker(...))`로 잡아줍니다).
-- **`order-service → inventory-service`의 재고 차감(`reserve`)**: 아직은 안 됩니다. `DECRBY`는 멱등하지 않아서, 지금 상태로 재시도를 걸면 "타임아웃났는데 사실은 서버에서 차감은 성공했던" 상황에서 이중 차감이 일어날 수 있습니다. 재시도를 걸려면 먼저 이 호출에도 멱등키(예: 요청 ID 기반)를 도입해야 합니다.
+- **`order-service → payment-service` 호출**: 실제로 `@Retry`를 붙였습니다. 다만 처음 예상과 달리 "Resilience4j가 알아서 순서를 잡아준다"는 말만 믿고 애노테이션만 추가했더니, `@CircuitBreaker(fallbackMethod = ...)`가 실패를 예외 대신 값으로 바꿔버려서 바깥의 `@Retry`가 실패 자체를 못 보는 버그가 있었습니다 — fallback을 `@CircuitBreaker`가 아니라 `@Retry` 쪽으로 옮기고 나서야 재시도가 실제로 동작했습니다. 이 문제를 재현 가능한 형태로 따로 검증해보려고 [circuit-breaker-lab](https://github.com/yoonxjoong/circuit-breaker-lab)을 새로 만들었습니다 (아직 실행 결과는 없음, 진행 중).
+- **`order-service → inventory-service`의 재고 차감(`reserve`)**: 이후 실제로 멱등키를 도입했습니다. Redis Lua 스크립트에 멱등성 마커를 추가하고, 전송 방식도 처음엔 요청 바디에 뒀다가 이후 `Idempotency-Key` HTTP 헤더로 옮겼습니다(`payment-service`도 동일하게 헤더 방식으로 통일).
 
 ## 한계 및 남는 궁금증
 
-- `retry-storm-lab`으로 Retry Storm 재현과 Backoff+Jitter의 효과는 실제로 검증했지만, 이걸 `ecommerce-msa`의 실제 서비스 호출(`order-service → payment-service`)에 붙이는 건 아직 안 했습니다. `inventory-service`의 재고 차감에 멱등키를 먼저 도입하는 것도 마찬가지로 남아있습니다.
+- `@CircuitBreaker`와 `@Retry`를 같이 쓸 때 fallback을 어디에 둬야 하는지가 위에서 겪은 것처럼 직관적이지 않습니다. [circuit-breaker-lab](https://github.com/yoonxjoong/circuit-breaker-lab)에서 이 문제를 재현 가능한 형태로 만들어뒀는데, 아직 직접 돌려서 실측 숫자를 확인하진 않았습니다.
 - `backoff-jitter`가 100% 성공한 건 이번 부하 조건(가상 사용자 50명, 최대 시도 5회)에서의 결과입니다. 부하가 더 크거나 서버 용량이 더 작았다면 5번의 재시도로도 부족했을 수 있어서, "얼마나 재시도하면 충분한지"는 여전히 트래픽 패턴에 달린 문제입니다.
 - AWS 블로그의 Jitter 전략 세 가지(Full/Equal/Decorrelated)를 각각 정확히 구현해서 비교한 건 아니고, Resilience4j가 기본 제공하는 `IntervalFunction.ofExponentialRandomBackoff`(자체 랜덤화 공식) 하나만 써봤습니다. 이게 세 전략 중 어디에 가장 가까운지, 서로 실제로 얼마나 차이 나는지는 다음에 직접 비교해보고 싶습니다.
 - 재시도 총 횟수, 최대 대기 시간 상한 같은 값도 다 감으로 잡은 부분이라, 이것도 결국 [Circuit Breaker 글](/posts/ecommerce-architecture/)에서 짚었던 "실측 없이 정한 기본값" 문제와 똑같이 남아있습니다.
 
-기회가 되면 `inventory-service`의 재고 차감 호출에 멱등키를 먼저 붙이고, 그 위에 Retry + Circuit Breaker를 `ecommerce-msa`에 실제로 얹어서 Retry Storm이 억제되는 걸 직접 확인해보고 싶습니다.
+`inventory-service`에 멱등키를 붙이고 `ecommerce-msa`에 Retry + Circuit Breaker를 실제로 얹는 것까지는 해봤습니다. 다음은 [circuit-breaker-lab](https://github.com/yoonxjoong/circuit-breaker-lab)을 직접 돌려서, Circuit Breaker가 Retry Storm을 억제하는 것과 fallback 위치에 따라 재시도가 죽어버리는 것 둘 다 숫자로 확인해보고 싶습니다.
 
 ## 참고 자료
 
