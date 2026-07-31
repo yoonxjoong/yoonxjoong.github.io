@@ -152,7 +152,7 @@ Retry ( CircuitBreaker ( RateLimiter ( TimeLimiter ( Bulkhead ( 실제 호출 ) 
 
 [ecommerce-msa](https://github.com/yoonxjoong/ecommerce-msa) 기준으로 정리해보면:
 
-- **`order-service → payment-service` 호출**: 실제로 `@Retry`를 붙였습니다. 다만 처음 예상과 달리 "Resilience4j가 알아서 순서를 잡아준다"는 말만 믿고 애노테이션만 추가했더니, `@CircuitBreaker(fallbackMethod = ...)`가 실패를 예외 대신 값으로 바꿔버려서 바깥의 `@Retry`가 실패 자체를 못 보는 버그가 있었습니다 — fallback을 `@CircuitBreaker`가 아니라 `@Retry` 쪽으로 옮기고 나서야 재시도가 실제로 동작했습니다. 이 문제를 재현 가능한 형태로 따로 검증해보려고 [circuit-breaker-lab](https://github.com/yoonxjoong/circuit-breaker-lab)을 새로 만들었습니다 (아직 실행 결과는 없음, 진행 중).
+- **`order-service → payment-service` 호출**: 실제로 `@Retry`를 붙였습니다. 다만 처음 예상과 달리 "Resilience4j가 알아서 순서를 잡아준다"는 말만 믿고 애노테이션만 추가했더니, `@CircuitBreaker(fallbackMethod = ...)`가 실패를 예외 대신 값으로 바꿔버려서 바깥의 `@Retry`가 실패 자체를 못 보는 버그가 있었습니다 — fallback을 `@CircuitBreaker`가 아니라 `@Retry` 쪽으로 옮기고 나서야 재시도가 실제로 동작했습니다. 자세한 내용과 재현 실험은 [Circuit Breaker 전용 글](/posts/circuit-breaker-resilience4j/)에 따로 정리했습니다.
 - **`order-service → inventory-service`의 재고 차감(`reserve`)**: 이후 실제로 멱등키를 도입했습니다. Redis Lua 스크립트에 멱등성 마커를 추가하고, 전송 방식도 처음엔 요청 바디에 뒀다가 이후 `Idempotency-Key` HTTP 헤더로 옮겼습니다(`payment-service`도 동일하게 헤더 방식으로 통일).
 
 ## 한계 및 남는 궁금증
