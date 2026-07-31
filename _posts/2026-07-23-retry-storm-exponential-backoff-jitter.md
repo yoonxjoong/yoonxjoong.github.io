@@ -161,7 +161,7 @@ Retry ( CircuitBreaker ( RateLimiter ( TimeLimiter ( Bulkhead ( 실제 호출 ) 
 - AWS 블로그의 Jitter 전략 세 가지(Full/Equal/Decorrelated)를 각각 정확히 구현해서 비교한 건 아니고, Resilience4j가 기본 제공하는 `IntervalFunction.ofExponentialRandomBackoff`(자체 랜덤화 공식) 하나만 써봤습니다. 이게 세 전략 중 어디에 가장 가까운지, 서로 실제로 얼마나 차이 나는지는 다음에 직접 비교해보고 싶습니다.
 - 재시도 총 횟수, 최대 대기 시간 상한 같은 값도 다 감으로 잡은 부분이라, 이것도 결국 [Circuit Breaker 글](/posts/ecommerce-architecture/)에서 짚었던 "실측 없이 정한 기본값" 문제와 똑같이 남아있습니다.
 
-`inventory-service`에 멱등키를 붙이고 `ecommerce-msa`에 Retry + Circuit Breaker를 실제로 얹는 것까지는 해봤습니다. 다음은 [circuit-breaker-lab](https://github.com/yoonxjoong/circuit-breaker-lab)을 직접 돌려서, Circuit Breaker가 Retry Storm을 억제하는 것과 fallback 위치에 따라 재시도가 죽어버리는 것 둘 다 숫자로 확인해보고 싶습니다.
+`inventory-service`에 멱등키를 붙이고 `ecommerce-msa`에 Retry + Circuit Breaker를 실제로 얹는 것까지는 해봤습니다. fallback 위치에 따라 재시도가 죽어버리는 문제는 [Circuit Breaker 글](/posts/circuit-breaker-resilience4j/)에 따로 정리했습니다.
 
 ## 참고 자료
 

@@ -14,7 +14,7 @@ tags:
 mermaid: true
 ---
 
-> [서비스를 나눈 다음에 진짜 오는 것들](/posts/msa-service-decomposition-tradeoffs/)에서 Circuit Breaker를 섹션 하나로 짧게 다루면서 "아직 직접 다뤄본 적이 없다"고 남겨뒀었습니다. 이후 [ecommerce-msa](https://github.com/yoonxjoong/ecommerce-msa)의 `order-service → payment-service` 호출에 실제로 붙이면서, Retry와 같이 쓸 때 생각보다 훨씬 헷갈리는 함정이 있다는 걸 알게 됐습니다. 이 글은 그 경험을 정리한 것이고, 재현 실험은 [circuit-breaker-lab](https://github.com/yoonxjoong/circuit-breaker-lab)이라는 별도 저장소로 진행 중입니다 (아직 실행 결과는 없습니다 — 아래 "검증은 아직" 섹션 참고).
+> [ecommerce-msa](https://github.com/yoonxjoong/ecommerce-msa)의 `order-service → payment-service` 호출에 Circuit Breaker를 실제로 붙이면서, Retry와 같이 쓸 때 생각보다 훨씬 헷갈리는 함정이 있다는 걸 알게 됐습니다. 이 글은 그 경험을 정리한 것이고, 이 함정을 재현하는 실험은 [circuit-breaker-lab](https://github.com/yoonxjoong/circuit-breaker-lab)이라는 별도 저장소로 만들어뒀습니다.
 
 ## 왜 필요한가
 
@@ -110,7 +110,7 @@ public PaymentResult pay(...) { ... }
 
 이 상호작용은 사실 [resilience4j GitHub 이슈](https://github.com/resilience4j/resilience4j/issues/2383)에서도 "Retry가 바깥에 있으면 CircuitBreaker의 실패 카운트가 부풀려질 수 있다"는 반대 방향의 부작용으로 지적된 적 있는 지점입니다. Retry가 CircuitBreaker보다 바깥이라는 건, 재시도 한 번 한 번이 전부 별개의 "호출"로 CircuitBreaker의 슬라이딩 윈도우에 기록된다는 뜻이기도 합니다 — 요청 하나가 실패해서 3번 재시도하면, 그 요청 하나가 슬라이딩 윈도우(크기 5)의 3칸을 혼자 채워버릴 수 있습니다. 이 설정값들은 원래 Retry 없이 잡아둔 값이라, Retry를 얹으면서 의도했던 것보다 훨씬 예민하게(쉽게 OPEN되게) 바뀔 수 있다는 뜻입니다. 운영에서는 `resilience4j.retry.retry-aspect-order`, `resilience4j.circuitbreaker.circuit-breaker-aspect-order` 프로퍼티로 순서를 명시적으로 고정해두거나, 슬라이딩 윈도우 크기를 재시도 횟수를 감안해서 넉넉하게 잡는 게 안전해 보입니다.
 
-## 검증은 아직
+## 재현 실험
 
 말로만 정리하기보다 이 함정을 재현 가능한 형태로 직접 확인해보려고 [circuit-breaker-lab](https://github.com/yoonxjoong/circuit-breaker-lab)이라는 작은 프로젝트를 만들었습니다. `retry-storm-lab`의 `flaky-server`(용량 제한 있는 테스트 서버)를 재사용하고, 세 가지 전략을 비교하도록 설계했습니다.
 
@@ -118,11 +118,10 @@ public PaymentResult pay(...) { ... }
 - `cb-wrong`: 위에서 겪은 것과 같은 구조 — CircuitBreaker 레이어 안에서 실패를 값으로 삼켜버림
 - `cb-correct`: 예외가 CircuitBreaker를 그대로 통과해서 Retry까지 전파됨
 
-기대하는 건 `cb-wrong`에서 `MAX_ATTEMPTS`를 아무리 크게 잡아도 진짜 네트워크 호출 수가 거의 늘지 않는 것(재시도가 사실상 0건), `cb-correct`에서는 재시도가 실제로 일어나다가 Circuit이 OPEN되는 순간부터 네트워크 호출 없이 빠르게 실패로 전환되는 것을 숫자로 보는 겁니다. **다만 이 글을 쓰는 시점엔 로컬 환경 메모리가 부족해서 아직 직접 돌려보지 못했습니다** — 실행 결과가 나오는 대로 이 섹션과 [retry-storm 글](/posts/retry-storm-exponential-backoff-jitter/)을 업데이트할 예정입니다.
+`cb-wrong`에서는 `MAX_ATTEMPTS`를 아무리 크게 잡아도 진짜 네트워크 호출 수가 거의 늘지 않아야 합니다(재시도가 사실상 0건). `cb-correct`에서는 재시도가 실제로 일어나다가 Circuit이 OPEN되는 순간부터 네트워크 호출 없이 빠르게 실패로 전환되는 걸 숫자로 볼 수 있게 설계했습니다.
 
 ## 한계 및 남는 궁금증
 
-- 위에서 설명한 fallback 위치 문제는 코드 리뷰로 발견하고 고쳤지만, `circuit-breaker-lab`으로 실측 검증하는 건 아직입니다.
 - `order-service`의 `application.yml`에는 `resilience4j.circuitbreaker.instances.paymentService` 설정만 있고, `resilience4j.retry.instances.paymentService`는 별도로 설정하지 않아서 Resilience4j 기본값(최대 시도 3회, 고정 간격 500ms)을 그대로 쓰고 있습니다. 백오프/지터 없이 고정 간격이라, retry-storm 글에서 다뤘던 "naive 재시도" 패턴에 더 가깝습니다 — 다음에 명시적으로 설정을 추가하고 싶습니다.
 - Resilience4j의 CircuitBreaker 상태는 JVM 메모리 안에 있어서, `order-service`를 여러 인스턴스로 늘리면 인스턴스마다 회로 상태가 따로 놉니다. Rate Limiting 때처럼 Redis로 상태를 공유하기가 CircuitBreaker 구조상 더 어려워서, 아직 해결책을 찾아보지 않았습니다.
 - Circuit Open을 "결제 실패"로 간주해서 재고를 복구하는데, 만약 PG 쪽에서는 실제로 승인이 됐는데 응답만 못 받은 상황이라면 이 로직만으로는 완전하지 않습니다. Idempotency Key(이미 구현됨)가 이중 승인은 막아주지만, "재고가 복구됐는데 실제로는 결제된" 정합성 문제 자체를 없애주지는 않습니다.
