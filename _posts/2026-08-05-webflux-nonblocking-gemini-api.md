@@ -195,22 +195,95 @@ sequenceDiagram
 
 `minimum-number-of-calls: 10` 덕분에 처음 9번까지는 계속 실제로 Gemini까지 왕복하며 502를 받다가, 10번째에 실패율이 100%로 확정되는 순간 OPEN으로 전환됐습니다. 그 뒤로는 응답이 눈에 띄게 빨라졌습니다 — 네트워크 시도 자체를 안 하고 즉시 503을 돌려주기 때문입니다.
 
-여기서 한 가지 놓치기 쉬운 디테일도 확인했습니다. `automatic-transition-from-open-to-half-open-enabled`를 따로 안 켜서 기본값이 `false`인데, 이 경우 15초가 지나도 백그라운드 타이머가 알아서 HALF_OPEN으로 바꿔주지 않습니다. **15초가 지난 뒤 다음 요청이 실제로 들어와야** 그 요청을 계기로 HALF_OPEN 전환이 일어납니다. 실제로 `/actuator/circuitbreakers`를 확인해보니, 요청 없이 시간만 흘려보내면 상태가 `OPEN`에 그대로 머물러 있었습니다.
+여기서 한 가지 놓치기 쉬운 디테일도 확인했습니다. `automatic-transition-from-open-to-half-open-enabled`를 따로 안 켜서 기본값이 `false`인데, 이 경우 15초가 지나도 백그라운드 타이머가 알아서 HALF_OPEN으로 바꿔주지 않습니다. **15초가 지난 뒤 다음 요청이 실제로 들어와야** 그 요청을 계기로 HALF_OPEN 전환이 일어납니다.
+
+실제로 15초를 기다렸다가 요청을 한 번 보내고 `/actuator/circuitbreakers`를 찍어보니:
+
+```json
+{
+  "circuitBreakers": {
+    "gemini": {
+      "failureRate": "-1.0%",
+      "slowCallRate": "-1.0%",
+      "failureRateThreshold": "50.0%",
+      "slowCallRateThreshold": "100.0%",
+      "bufferedCalls": 1,
+      "failedCalls": 1,
+      "slowCalls": 0,
+      "slowFailedCalls": 0,
+      "notPermittedCalls": 0,
+      "state": "HALF_OPEN"
+    }
+  }
+}
+```
+
+`state`가 `HALF_OPEN`으로 바뀌었고, 시험 호출 1건이 나가서 그것도 실패한 상태입니다(`bufferedCalls: 1`, `failedCalls: 1`). `permitted-number-of-calls-in-half-open-state: 5`라서 이 1건만으로는 아직 판단하지 않고, 5건이 채워질 때까지 계속 시험 호출을 받습니다. 같은 요청을 4번 더 보내서 5건을 채우니:
 
 ```json
 {
   "circuitBreakers": {
     "gemini": {
       "failureRate": "100.0%",
+      "slowCallRate": "0.0%",
+      "failureRateThreshold": "50.0%",
+      "slowCallRateThreshold": "100.0%",
       "bufferedCalls": 5,
       "failedCalls": 5,
+      "slowCalls": 0,
+      "slowFailedCalls": 0,
+      "notPermittedCalls": 0,
       "state": "OPEN"
     }
   }
 }
 ```
 
-HALF_OPEN에서 시험 호출 5건이 다 채워지고 다 실패하는 것도 실제로 확인했고, 유효한 키로 바꾼 뒤 정상 호출이 쌓이며 CLOSED가 유지되는 것까지 확인했습니다. 다만 CircuitBreaker 상태는 JVM 메모리에 있는 값이라 **앱을 재시작하면 완전히 새 서킷(CLOSED, 빈 슬라이딩 윈도우)으로 초기화**됩니다 — 재시작 후 CLOSED가 나오는 건 "복구에 성공해서"가 아니라 "새로 만들어져서"라는 걸 헷갈리지 않는 게 중요했습니다.
+시험 호출 5건이 다 채워졌고(`bufferedCalls: 5`) 전부 실패해서(`failedCalls: 5`, `failureRate: 100.0%`) 다시 `OPEN`으로 복귀했습니다. 여전히 잘못된 키로 테스트하고 있었으니 당연한 결과입니다.
+
+이제 유효한 키로 바꾸고 앱을 재시작한 뒤 다시 확인해보면:
+
+```json
+{
+  "circuitBreakers": {
+    "gemini": {
+      "failureRate": "-1.0%",
+      "slowCallRate": "-1.0%",
+      "failureRateThreshold": "50.0%",
+      "slowCallRateThreshold": "100.0%",
+      "bufferedCalls": 0,
+      "failedCalls": 0,
+      "slowCalls": 0,
+      "slowFailedCalls": 0,
+      "notPermittedCalls": 0,
+      "state": "CLOSED"
+    }
+  }
+}
+```
+
+`bufferedCalls: 0`인 채로 `CLOSED`입니다. 이건 "복구에 성공해서" CLOSED인 게 아니라, CircuitBreaker 상태가 JVM 메모리에 있어서 **재시작하면 완전히 새 서킷(빈 슬라이딩 윈도우)으로 초기화**됐기 때문입니다 — 이 시점에는 아직 아무 검증도 안 된 상태입니다. 실제 이미지로 몇 번 호출해서 호출이 쌓이는 걸 다시 확인하니:
+
+```json
+{
+  "circuitBreakers": {
+    "gemini": {
+      "failureRate": "-1.0%",
+      "slowCallRate": "-1.0%",
+      "failureRateThreshold": "50.0%",
+      "slowCallRateThreshold": "100.0%",
+      "bufferedCalls": 3,
+      "failedCalls": 1,
+      "slowCalls": 0,
+      "slowFailedCalls": 0,
+      "notPermittedCalls": 0,
+      "state": "CLOSED"
+    }
+  }
+}
+```
+
+3건 중 1건이 실패했는데도 `failureRate`는 여전히 `-1.0%`(미집계)입니다. `minimum-number-of-calls: 10`을 아직 못 채워서 CircuitBreaker가 실패율 판단 자체를 시작 안 한 겁니다 — 그래서 `state`는 CLOSED를 유지합니다. CLOSED → OPEN → HALF_OPEN → OPEN(재시도 실패) → (재시작 후) CLOSED까지, 설계한 상태 전이를 전부 실제 호출로 재현해본 셈입니다.
 
 ## Bulkhead도 같이 붙이기
 
@@ -235,13 +308,6 @@ resilience4j:
 순서는 resilience4j 기본 합성 순서(`Retry(CircuitBreaker(RateLimiter(TimeLimiter(Bulkhead(호출)))))`)를 그대로 따랐습니다. CircuitBreaker가 제일 바깥에서 먼저 "호출 자체를 허용할지" 판단하고, 통과한 요청만 TimeLimiter가 시간을 재고, 마지막으로 Bulkhead가 동시 호출 슬롯을 확인합니다. 슬롯이 꽉 차 있으면 `BulkheadFullException`이 던져지고, `GlobalExceptionHandler`가 이걸 429로 매핑합니다.
 
 이건 `SemaphoreBulkhead`라서(`max-wait-duration: 0`으로 대기 없이 즉시 거절하는 카운터 방식) 스레드 풀 자체를 분리하는 건 아니고 동시 호출 수만 제한합니다. 진짜 스레드 격리를 하려면 `ThreadPoolBulkhead`가 필요한데, 지금은 Gemini 호출 자체가 WebClient로 논블로킹이라 스레드를 물고 있는 게 아니어서 세마포어 방식으로 충분하다고 판단했습니다.
-
-## 한계 및 남는 궁금증
-
-- CircuitBreaker/TimeLimiter의 합성 순서와 Retry를 같이 쓸 때 생기는 함정은 이미 [Circuit Breaker: 장애가 옆으로 안 번지게 막는 법](/posts/circuit-breaker-resilience4j/)에서 다뤘던 내용이라 이 글에서는 반복하지 않았습니다. 이 프로젝트에는 아직 `@Retry`를 얹지 않았는데, 붙이게 되면 그 글에서 겪은 fallback 위치 함정을 그대로 다시 점검해야 합니다.
-- 실제 CLOSED 복구(HALF_OPEN → CLOSED)를 재현할 때 앱을 재시작하는 방식으로는 진짜 복구를 검증한 게 아니라는 걸 뒤늦게 깨달았습니다. 앱을 계속 띄워둔 채로 실패 원인만 없애는 방식(예: 토글 가능한 mock 서버)으로 다시 검증해보고 싶습니다.
-- `gemini.api-key`/`gemini.base-url`이 `@ConfigurationProperties` record라 런타임에 값을 바꿀 방법이 없습니다. `@RefreshScope` + `/actuator/refresh`를 붙이면 재시작 없이 복구 테스트가 가능할 것 같은데, 지금 규모에는 과할 수 있어서 보류했습니다.
-- 이건 어디까지나 회사 코드베이스에 붙이기 전 단계의 테스트 프로젝트입니다. 실제 도입 시에는 회사 쪽 요구사항(응답 스키마, 에러 처리 정책, 이미지 저장 방식 등)에 맞춰 이 구조를 다시 다듬어야 합니다.
 
 ## 참고 자료
 
