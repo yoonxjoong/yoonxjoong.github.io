@@ -11,6 +11,8 @@ tags:
   - MSA
   - Concurrency
   - Outbox Pattern
+  - Distributed Lock
+  - Fencing Token
 mermaid: true
 ---
 
@@ -115,6 +117,51 @@ sequenceDiagram
 ```
 
 여기서 중요한 건 **TTL**입니다. 좌석을 선점만 하고 결제를 하지 않는 사용자가 있을 수밖에 없는데, TTL이 없으면 그 좌석은 영영 안 팔리는 좌석이 되어버립니다. TTL이 지나면 자동으로 락이 풀리고 좌석이 다시 매물로 나오도록 해야 합니다.
+
+### TTL이 만료되는 순간과 결제 완료가 겹치면?
+
+그런데 이 TTL이 오히려 새로운 구멍을 만듭니다. 사용자 A가 TTL(5분)이 거의 다 될 때쯤 결제 버튼을 눌렀는데, PG(결제 게이트웨이) 응답이 늦어지면서 실제 승인이 TTL을 넘겨서 도착하면 어떻게 될까요?
+
+```mermaid
+sequenceDiagram
+    participant A as 사용자 A
+    participant B as 사용자 B
+    participant R as 예매 서비스
+    participant L as Redis (분산 락)
+    participant P as 결제 서비스
+
+    A->>R: 좌석 12열 5번 선택
+    R->>L: SETNX seat:12-5 (TTL 5분)
+    L-->>R: 락 획득 성공
+    R-->>A: 임시 선점 완료
+
+    A->>P: 4분 59초에 결제 요청 (PG 응답 지연)
+    Note over L: TTL 만료, seat:12-5 키 삭제됨
+
+    B->>R: 좌석 12열 5번 선택
+    R->>L: SETNX seat:12-5
+    L-->>R: 락 획득 성공 (A의 락은 이미 사라짐)
+    R-->>B: 임시 선점 완료
+
+    P-->>R: A의 결제 승인 완료 (뒤늦게 도착)
+    Note over R: 아무 검증 없이 CONFIRMED 처리하면<br/>B가 이미 선점한 좌석과 충돌 (이중 판매 위험)
+```
+
+Redis 락은 **"선점→결제→확정" 전체 구간이 TTL 안에 끝난다는 걸 전제**로 하는데, PG 호출 지연 시간은 애초에 상한을 보장할 수 없습니다. TTL을 아무리 넉넉히 잡아도 이론적으로는 항상 뚫릴 수 있는 레이스입니다.
+
+**해결책은 Redis 락을 "최종 권위"가 아니라 "1차 필터"로만 쓰고, 실제 확정은 DB 조건부 업데이트로 다시 검증하는 것**입니다.
+
+```sql
+UPDATE seats
+SET status = 'CONFIRMED', owner_id = :userId
+WHERE seat_id = :seatId AND status = 'HELD' AND held_by = :userId;
+```
+
+A의 결제 승인이 뒤늦게 도착했을 때, DB에는 이미 B가 새로 `HELD`로 선점해놓은 상태라면 `held_by = A` 조건이 안 맞아서 이 UPDATE는 **0 rows affected**로 끝납니다. 시스템이 "A의 확정 시도가 실패했다"는 걸 명확히 알 수 있고, 이 경우 A는 결제가 이미 됐으니 **환불(보상 트랜잭션)**로 빠지면 됩니다.
+
+이 `held_by` 컬럼 체크는 사실 Martin Kleppmann이 Redlock을 비판하면서 제안한 **펜싱 토큰(Fencing Token)**의 단순화 버전이라고 볼 수 있습니다 — 락을 새로 잡을 때마다 단조 증가하는 토큰을 발급하고, 자원 갱신 시 "내가 가진 토큰이 최신 토큰보다 낮으면 거부"하는 방식인데, 여기서는 별도 토큰 대신 좌석의 `held_by`(현재 소유자) 자체가 그 역할을 대신합니다. 좌석당 소유자가 하나뿐이라 별도 토큰 카운터 없이도 같은 효과를 낼 수 있어서, 이 구조에서는 이 방식이 가장 단순하면서 안전한 선택이라고 판단했습니다.
+
+TTL을 "선택 유지 시간"과 "결제 진행 시간"으로 분리해서 결제 버튼을 누르는 순간 별도 상태(`PAYMENT_IN_PROGRESS`)로 전환하는 것도 레이스 확률을 줄이는 데 도움이 되지만, PG 응답 지연 자체는 상한이 없기 때문에 어디까지나 완화책일 뿐입니다. 확정 시점의 소유자 검증은 TTL 설정과 무관하게 항상 필요합니다.
 
 ## 3. 데이터 정합성 : 결제와 재고를 일치시키기
 
