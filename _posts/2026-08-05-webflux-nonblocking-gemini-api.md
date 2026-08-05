@@ -1,6 +1,6 @@
 ---
 title: "Gemini API 연동 전에 WebFlux로 먼저 만들어본 테스트 프로젝트"
-description: 회사에 이미지 기반 상품 정보 추출 기능(Gemini Vision API 연동)을 실제로 붙이기 전에, WebFlux가 이 문제를 감당할 수 있을지 미리 검증해보려고 만든 테스트 프로젝트 기록입니다. Mono가 실제로 뭘 의미하는지, WebClient/TimeLimiter/CircuitBreaker를 어떤 순서로 엮어야 하는지, 그리고 "서버와 클라이언트 스레드풀이 분리돼 있을 것"이라고 넘겨짚었다가 Reactor Netty 소스를 직접 까보고 정정한 이야기까지 담았습니다.
+description: 회사에 이미지 기반 상품 정보 추출 기능(Gemini Vision API 연동)을 실제로 붙이기 전에, WebFlux가 이 문제를 감당할 수 있을지 미리 검증해보려고 만든 테스트 프로젝트 기록입니다. Mono가 실제로 뭘 의미하는지, WebClient/TimeLimiter/CircuitBreaker/Bulkhead를 어떤 순서로 엮어야 하는지, Netty 이벤트루프 내부 구조, 그리고 CircuitBreaker 상태 전이를 actuator로 직접 확인한 기록까지 담았습니다.
 author: yoonxjoong
 date: 2026-08-05 10:00:00 +0900
 categories:
@@ -118,38 +118,6 @@ HttpClient httpClient = HttpClient.create()
 ```
 
 이 `ReadTimeoutHandler`(전송 계층 타임아웃, "연결은 됐는데 응답 바이트가 안 옴")와 `GeminiClient`의 `TimeLimiter`(리액티브 체인 레벨 타임아웃)는 역할이 다릅니다. 이게 없으면 커넥션 자체는 살아있는 채로 무한 대기할 수 있습니다.
-
-## 넘겨짚었다가 정정한 것 — 서버와 클라이언트 스레드풀이 분리돼 있을 거라는 착각
-
-처음엔 "서버가 요청 받는 이벤트루프와 WebClient가 Gemini 호출하는 이벤트루프는 당연히 분리돼 있겠지"라고 별생각 없이 넘겨짚었습니다. 근데 확인해보니 **틀렸습니다.** Reactor Netty 소스를 직접 까봤습니다.
-
-```java
-// reactor-netty-http .../HttpClientConfig.java
-@Override
-protected LoopResources defaultLoopResources() {
-    return HttpResources.get();
-}
-
-// reactor-netty-http .../HttpServerConfig.java
-@Override
-protected LoopResources defaultLoopResources() {
-    return HttpResources.get();
-}
-```
-
-둘 다 `HttpResources.get()`을 리턴하는데, 이건 JVM 전체에서 하나뿐인 전역 싱글톤입니다.
-
-```java
-// HttpResources.java
-static final AtomicReference<HttpResources> httpResources;
-public static HttpResources get() {
-    return getOrCreate(httpResources, null, null, ON_HTTP_NEW, "http");
-}
-```
-
-Spring Boot 쪽도 마찬가지입니다. 내장 서버(`NettyReactiveWebServerFactory`)는 `HttpServer.create()`를 그대로 쓰고, Spring Boot가 자동설정하는 `ReactorResourceFactory` 빈도 기본값이 `useGlobalResources = true`라서 결국 같은 `HttpResources.get()`으로 수렴합니다. 이 프로젝트의 `WebClientConfig`는 그 `ReactorResourceFactory`조차 거치지 않고 `HttpClient.create()`를 직접 호출하지만, 어느 경로로 가든 종착지는 같습니다.
-
-즉 **서버가 요청을 받는 스레드와 Gemini를 호출하는 스레드는 실제로 같은 풀**입니다(스레드 이름 접두사는 `reactor-http-nio-*`). 걱정할 필요는 없습니다 — 양쪽 다 순수 논블로킹 콜백이라 스레드를 "점유"하는 게 아니라 이벤트 발생 시 잠깐 실행되고 반납하는 방식이기 때문에, Reactor Netty가 기본을 아예 "공유"로 잡아둔 겁니다. 문제가 생기는 유일한 경우는 이 콜백 안에 blocking 코드가 섞여 들어갈 때인데, 그건 이미 `boundedElastic`으로 격리해뒀습니다.
 
 ## CircuitBreaker를 실제로 열어보고 닫아본 기록
 
