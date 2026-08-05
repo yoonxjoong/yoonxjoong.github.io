@@ -11,6 +11,7 @@ tags:
   - Reactor
   - Netty
   - Resilience4j
+  - Bulkhead
   - Gemini API
 mermaid: true
 ---
@@ -150,8 +151,6 @@ Spring Boot 쪽도 마찬가지입니다. 내장 서버(`NettyReactiveWebServerF
 
 즉 **서버가 요청을 받는 스레드와 Gemini를 호출하는 스레드는 실제로 같은 풀**입니다(스레드 이름 접두사는 `reactor-http-nio-*`). 걱정할 필요는 없습니다 — 양쪽 다 순수 논블로킹 콜백이라 스레드를 "점유"하는 게 아니라 이벤트 발생 시 잠깐 실행되고 반납하는 방식이기 때문에, Reactor Netty가 기본을 아예 "공유"로 잡아둔 겁니다. 문제가 생기는 유일한 경우는 이 콜백 안에 blocking 코드가 섞여 들어갈 때인데, 그건 이미 `boundedElastic`으로 격리해뒀습니다.
 
-이 경험에서 얻은 교훈은 단순합니다 — "당연히 이렇겠지"는 검증이 아니라는 것. 실제로 프레임워크 소스를 한 겹만 까봐도 생각과 다른 경우가 있었습니다.
-
 ## CircuitBreaker를 실제로 열어보고 닫아본 기록
 
 설정은 이렇게 잡았습니다.
@@ -213,12 +212,35 @@ sequenceDiagram
 
 HALF_OPEN에서 시험 호출 5건이 다 채워지고 다 실패하는 것도 실제로 확인했고, 유효한 키로 바꾼 뒤 정상 호출이 쌓이며 CLOSED가 유지되는 것까지 확인했습니다. 다만 CircuitBreaker 상태는 JVM 메모리에 있는 값이라 **앱을 재시작하면 완전히 새 서킷(CLOSED, 빈 슬라이딩 윈도우)으로 초기화**됩니다 — 재시작 후 CLOSED가 나오는 건 "복구에 성공해서"가 아니라 "새로 만들어져서"라는 걸 헷갈리지 않는 게 중요했습니다.
 
+## Bulkhead도 같이 붙이기
+
+CircuitBreaker만으로는 빈 구멍이 하나 있습니다. Gemini가 완전히 죽은 게 아니라 **그냥 느리기만 한 경우**(타임아웃 문턱을 아슬아슬하게 못 넘는 정도)엔 실패로 카운트되지 않아서 CircuitBreaker가 반응하기 전까지 계속 실제 호출이 나갑니다. 동시 요청이 몰리면 그만큼 Gemini 호출이 동시에 쌓이는데, 이건 실패율과 무관한 문제라 CircuitBreaker가 막아주지 않습니다. 그래서 Bulkhead로 **동시 호출 수 자체에 상한**을 걸었습니다.
+
+```yaml
+resilience4j:
+  bulkhead:
+    instances:
+      gemini:
+        max-concurrent-calls: 10   # 동시에 10건까지만 허용
+        max-wait-duration: 0       # 대기 없이 바로 거절
+```
+
+```java
+.flatMap(this::extractText)
+.transformDeferred(BulkheadOperator.of(bulkhead))
+.transformDeferred(TimeLimiterOperator.of(timeLimiter))
+.transformDeferred(CircuitBreakerOperator.of(circuitBreaker));
+```
+
+순서는 resilience4j 기본 합성 순서(`Retry(CircuitBreaker(RateLimiter(TimeLimiter(Bulkhead(호출)))))`)를 그대로 따랐습니다. CircuitBreaker가 제일 바깥에서 먼저 "호출 자체를 허용할지" 판단하고, 통과한 요청만 TimeLimiter가 시간을 재고, 마지막으로 Bulkhead가 동시 호출 슬롯을 확인합니다. 슬롯이 꽉 차 있으면 `BulkheadFullException`이 던져지고, `GlobalExceptionHandler`가 이걸 429로 매핑합니다.
+
+이건 `SemaphoreBulkhead`라서(`max-wait-duration: 0`으로 대기 없이 즉시 거절하는 카운터 방식) 스레드 풀 자체를 분리하는 건 아니고 동시 호출 수만 제한합니다. 진짜 스레드 격리를 하려면 `ThreadPoolBulkhead`가 필요한데, 지금은 Gemini 호출 자체가 WebClient로 논블로킹이라 스레드를 물고 있는 게 아니어서 세마포어 방식으로 충분하다고 판단했습니다.
+
 ## 한계 및 남는 궁금증
 
 - CircuitBreaker/TimeLimiter의 합성 순서와 Retry를 같이 쓸 때 생기는 함정은 이미 [Circuit Breaker: 장애가 옆으로 안 번지게 막는 법](/posts/circuit-breaker-resilience4j/)에서 다뤘던 내용이라 이 글에서는 반복하지 않았습니다. 이 프로젝트에는 아직 `@Retry`를 얹지 않았는데, 붙이게 되면 그 글에서 겪은 fallback 위치 함정을 그대로 다시 점검해야 합니다.
 - 실제 CLOSED 복구(HALF_OPEN → CLOSED)를 재현할 때 앱을 재시작하는 방식으로는 진짜 복구를 검증한 게 아니라는 걸 뒤늦게 깨달았습니다. 앱을 계속 띄워둔 채로 실패 원인만 없애는 방식(예: 토글 가능한 mock 서버)으로 다시 검증해보고 싶습니다.
 - `gemini.api-key`/`gemini.base-url`이 `@ConfigurationProperties` record라 런타임에 값을 바꿀 방법이 없습니다. `@RefreshScope` + `/actuator/refresh`를 붙이면 재시작 없이 복구 테스트가 가능할 것 같은데, 지금 규모에는 과할 수 있어서 보류했습니다.
-- Bulkhead는 아직 안 붙였습니다. 지금은 Gemini 호출 자체가 논블로킹이라 스레드 고갈 문제는 없지만, 동시 요청이 몰렸을 때 Gemini API 쿼터/비용을 제어하려면 동시 호출 수 상한(Bulkhead)을 추가로 검토해볼 만합니다.
 - 이건 어디까지나 회사 코드베이스에 붙이기 전 단계의 테스트 프로젝트입니다. 실제 도입 시에는 회사 쪽 요구사항(응답 스키마, 에러 처리 정책, 이미지 저장 방식 등)에 맞춰 이 구조를 다시 다듬어야 합니다.
 
 ## 참고 자료
