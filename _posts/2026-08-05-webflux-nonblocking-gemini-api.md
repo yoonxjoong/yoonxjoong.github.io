@@ -1,6 +1,6 @@
 ---
-title: "WebFlux로 느린 외부 API 호출이 서비스 전체를 잠식하지 못하게 막기"
-description: 이미지를 업로드하면 Gemini Vision API로 상품 정보를 추출하는 기능을 WebFlux로 만들면서 겪은 것들을 정리합니다. Mono가 실제로 뭘 의미하는지, WebClient/TimeLimiter/CircuitBreaker를 어떤 순서로 엮어야 하는지, 그리고 "서버와 클라이언트 스레드풀이 분리돼 있을 것"이라고 넘겨짚었다가 Reactor Netty 소스를 직접 까보고 정정한 이야기까지 담았습니다.
+title: "Gemini API 연동 전에 WebFlux로 먼저 만들어본 테스트 프로젝트"
+description: 회사에 이미지 기반 상품 정보 추출 기능(Gemini Vision API 연동)을 실제로 붙이기 전에, WebFlux가 이 문제를 감당할 수 있을지 미리 검증해보려고 만든 테스트 프로젝트 기록입니다. Mono가 실제로 뭘 의미하는지, WebClient/TimeLimiter/CircuitBreaker를 어떤 순서로 엮어야 하는지, 그리고 "서버와 클라이언트 스레드풀이 분리돼 있을 것"이라고 넘겨짚었다가 Reactor Netty 소스를 직접 까보고 정정한 이야기까지 담았습니다.
 author: yoonxjoong
 date: 2026-08-05 10:00:00 +0900
 categories:
@@ -15,7 +15,7 @@ tags:
 mermaid: true
 ---
 
-> 회사 업무에서 "이미지를 올리면 상품 정보를 JSON으로 뽑아준다"는 기능이 필요했는데, 이걸 처리해줄 Gemini Vision API 응답이 꽤 오래 걸립니다. 이 지연이 서비스 전체를 잠식하지 않게 막으려고 WebFlux로 별도 프로젝트를 만들어봤습니다. 코드는 [product-extractor](https://github.com/yoonxjoong/product-extractor)에 있습니다.
+> 회사 업무에서 "이미지를 올리면 상품 정보를 JSON으로 뽑아준다"는 기능이 필요한데, 이걸 처리해줄 Gemini Vision API 응답이 꽤 오래 걸립니다. 실제 코드베이스에 바로 붙이기 전에, WebFlux로 이 지연을 감당할 수 있을지 먼저 별도 프로젝트로 테스트해봤습니다. 코드는 [product-extractor](https://github.com/yoonxjoong/product-extractor)에 있습니다.
 
 ## 왜 블로킹 서버로는 안 되는가
 
@@ -219,6 +219,7 @@ HALF_OPEN에서 시험 호출 5건이 다 채워지고 다 실패하는 것도 �
 - 실제 CLOSED 복구(HALF_OPEN → CLOSED)를 재현할 때 앱을 재시작하는 방식으로는 진짜 복구를 검증한 게 아니라는 걸 뒤늦게 깨달았습니다. 앱을 계속 띄워둔 채로 실패 원인만 없애는 방식(예: 토글 가능한 mock 서버)으로 다시 검증해보고 싶습니다.
 - `gemini.api-key`/`gemini.base-url`이 `@ConfigurationProperties` record라 런타임에 값을 바꿀 방법이 없습니다. `@RefreshScope` + `/actuator/refresh`를 붙이면 재시작 없이 복구 테스트가 가능할 것 같은데, 지금 규모에는 과할 수 있어서 보류했습니다.
 - Bulkhead는 아직 안 붙였습니다. 지금은 Gemini 호출 자체가 논블로킹이라 스레드 고갈 문제는 없지만, 동시 요청이 몰렸을 때 Gemini API 쿼터/비용을 제어하려면 동시 호출 수 상한(Bulkhead)을 추가로 검토해볼 만합니다.
+- 이건 어디까지나 회사 코드베이스에 붙이기 전 단계의 테스트 프로젝트입니다. 실제 도입 시에는 회사 쪽 요구사항(응답 스키마, 에러 처리 정책, 이미지 저장 방식 등)에 맞춰 이 구조를 다시 다듬어야 합니다.
 
 ## 참고 자료
 
