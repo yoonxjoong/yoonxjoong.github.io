@@ -24,7 +24,7 @@ sequenceDiagram
     participant DB as Main Database
     participant Kafka as Kafka Broker
     participant Consumer as Kafka Consumer
-    participant External as External API (운송장 조회 / Email)
+    participant External as External API (운송장 등록 / Email)
 
     Note over Client: 페이지 진입 시(Mounted 시) Idempotency-Key(UUID) 1회 생성 후 고정
     Client->>API: POST /api/v1.0/delivery/request/auth (Header: Idempotency-Key)
@@ -197,7 +197,7 @@ public class ReqService {
 @RequiredArgsConstructor
 public class DeliveryKafkaConsumer {
 
-    private final GoodsFlowService goodsFlowService;
+    private final DeliveryTrackingService deliveryTrackingService;
     private final ReqService reqService;
 
     @KafkaListener(topics = "delivery-req-saved-topic", groupId = "delivery-external-api-group")
@@ -206,7 +206,7 @@ public class DeliveryKafkaConsumer {
 
         try {
             // 1. 운송장 등록 API 호출
-            goodsFlowService.deliveriesTracking(message.getReqNo(), null);
+            deliveryTrackingService.registerTracking(message.getReqNo(), null);
 
             // 2. 이메일 알림 전송 API 호출
             reqService.registerEmailNotification(message.getReqNo(), message.getCustPoBoxNo());
