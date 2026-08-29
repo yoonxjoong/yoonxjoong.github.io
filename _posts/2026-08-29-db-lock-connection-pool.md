@@ -2,7 +2,7 @@
 title: "조회수 UPDATE 하나가 전체 API를 멈춘 이유 - 락 경합과 커넥션 풀 고갈 재현"
 description: 핫 로우 UPDATE 경합이 어떻게 커넥션 풀을 고갈시키고 무관한 API까지 죽이는지 직접 측정해봤습니다.
 author: yoonxjoong
-date: 2026-08-29 18:00:00 +0900
+date: 2026-08-29 17:00:00 +0900
 categories:
   - Backend
 tags:
