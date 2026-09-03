@@ -11,6 +11,7 @@ tags:
   - MSA
   - Concurrency
   - Saga Pattern
+  - Circuit Breaker
   - Ecommerce
 mermaid: true
 ---
@@ -294,13 +295,43 @@ sequenceDiagram
     end
 ```
 
-Saga 보상(재고 복구) 여부를 결정하는 판단은 **Kafka 이벤트가 아니라 REST 동기 응답**으로 이루어집니다 — `order-service`가 결제 실패 응답을 받는 순간 곧바로 재고 복구를 호출하고, Kafka가 관여하지 않습니다. 그럼 Kafka/Outbox는 왜 넣었을까요? 아래에서 이어집니다.
+위 다이어그램에서 결제 서비스가 **APPROVED든 FAILED든 응답을 명확히 준 경우**엔, Saga 보상(재고 복구) 여부를 Kafka 이벤트가 아니라 REST 동기 응답만으로 그 자리에서 바로 판단합니다.
+
+그런데 여기엔 처음엔 못 보고 지나친 함정이 하나 있었습니다.
+
+### 응답을 아예 못 받은 경우는 얘기가 다릅니다
+
+결제 서비스가 느려지거나 죽어서 **응답 자체를 못 받는 경우**(타임아웃, 또는 아래에서 다룰 Circuit Breaker가 OPEN돼서 요청 자체를 막은 경우)엔 위 다이어그램의 `else 결제 실패` 분기를 그대로 타면 안 됩니다. "응답을 못 받았다"는 게 "결제가 실패했다"는 뜻이 아닐 수 있기 때문입니다 — 결제 서비스는 실제로 승인 처리까지 끝냈는데 응답만 네트워크 중간에서 유실됐을 가능성이 있습니다. 이 상태에서 곧바로 재고를 복구하고 주문을 취소해버리면, 뒤늦게 승인 이벤트가 도착해도 "이미 취소된 주문"이라 무시되고 **"돈은 받았는데 주문은 취소된"** 상태가 영구히 남습니다.
+
+그래서 실제로는 응답을 못 받은 경우를 별도로 나눠서, 즉시 보상 대신 **주문을 PENDING으로 남기고 나중에 진짜 결과로 확정**하는 방식으로 고쳤습니다.
+
+```mermaid
+sequenceDiagram
+    participant O as 주문 서비스
+    participant P as 결제 서비스
+    participant K as Kafka (payment-events)
+
+    O->>O: 주문 생성 (PENDING)
+    O->>P: POST /payments (Retry + Circuit Breaker + Bulkhead)
+    alt 응답을 받음
+        P-->>O: APPROVED/FAILED
+        O->>O: 주문 CONFIRMED/CANCELLED (즉시 처리)
+    else 응답을 못 받음
+        Note over O: 주문은 PENDING 유지
+        P-->>K: (요청이 실제로 도달했다면) Outbox로 이벤트 발행
+        K-->>O: PaymentEventListener가 구독해서 뒤늦게 CONFIRMED/CANCELLED로 확정
+        O->>O: PendingOrderTimeoutSweeper가 주기적으로 스캔 -<br/>N초 지나도 PENDING이면 안전망으로 강제 취소+재고복구
+    end
+```
+
+즉 Kafka/Outbox 파이프라인은 알림 발송뿐 아니라, **응답을 못 받은 결제 건의 최종 결과를 order-service가 뒤늦게라도 알아내는 통로**로도 쓰입니다. 그래도 요청이 결제 서비스에 아예 도달조차 못 한 경우(Circuit OPEN, Bulkhead 거부)엔 이벤트 자체가 영원히 안 오므로, `PendingOrderTimeoutSweeper`가 일정 시간(기본 30초) 지나도 PENDING인 주문을 마지막 안전망으로 강제 정리합니다.
 
 여기서 실무적으로 같이 고려한 것들:
 
 - **Outbox 패턴** (구현·검증함): 결제 서비스가 "결제 완료 처리"와 "이벤트 발행 기록"을 같은 트랜잭션으로 Outbox 테이블에 묶어서, 결제는 성공했는데 이벤트 발행에 실패해 후속 서비스가 영영 못 알게 되는 상황을 막습니다.
 - **Idempotency Key** (구현함): 네트워크 재시도로 같은 결제 요청이 두 번 들어와도 중복 승인되지 않도록, 요청마다 고유 키를 부여해 결제 서비스가 같은 키는 한 번만 처리하게 합니다.
-- **Circuit Breaker / APM 알림** (설계만 함, 미구현): 결제 서비스(특히 외부 PG사 연동)가 느려지거나 응답이 없을 때 [지난 글](/posts/msa-service-decomposition-tradeoffs/)에서 다룬 Circuit Breaker로 장애 전파를 막는 것, 비즈니스 지표 기반 알림을 거는 것은 이번 구현 범위에 넣지 못했습니다.
+- **Retry / Circuit Breaker / Bulkhead** (구현·검증함): 결제 서비스 호출에 Resilience4j로 재시도, 장애 전파 차단, 동시 호출 수 제한을 걸었습니다. 이 셋을 같이 쓸 때 만난 함정(CircuitBreaker의 fallback 위치에 따라 Retry가 아예 작동을 안 하는 문제)은 [별도 글](/posts/circuit-breaker-resilience4j/)로 정리했습니다.
+- **APM 알림** (설계만 함, 미구현): 비즈니스 지표 기반 알림을 거는 것은 이번 구현 범위에 넣지 못했습니다.
 
 Outbox 패턴과 Idempotency Key는 실제로 [payment-service](https://github.com/yoonxjoong/ecommerce-msa/tree/main/payment-service)에 그대로 있는 코드입니다.
 
@@ -356,7 +387,7 @@ public void publishPendingEvents() {
 
 `@Transactional`로 결제 승인과 이벤트 기록이 같은 로컬 트랜잭션에 묶이고, 별도 스케줄러(`OutboxRelay`)가 1초마다 미발행 이벤트를 Kafka로 발행합니다. Kafka를 일부러 내린 상태로 주문을 넣어봐도 결제/주문 흐름은 영향을 안 받고, Outbox 테이블에 `published_at`이 빈 채로 쌓여있다가 Kafka가 복구되면 릴레이가 밀린 이벤트를 마저 발행하는 것까지 확인했습니다.
 
-한 가지 짚을 점: 위에서 봤듯 Saga 보상은 REST 동기 응답만으로 이미 끝나기 때문에, Outbox→Kafka 파이프라인은 재고/주문 흐름과는 완전히 별개입니다. 처음엔 이 파이프라인을 구독하는 컨슈머가 하나도 없었는데, [notification-service](https://github.com/yoonxjoong/ecommerce-msa/tree/main/notification-service)를 추가로 만들어서 실제로 이어봤습니다 — `payment-events`를 구독해서 결제 완료/실패에 따라 알림 로그를 남기는 역할만 하는 작은 컨슈머입니다.
+한 가지 짚을 점: 응답을 명확히 받은 경우(APPROVED/FAILED)의 Saga 보상은 REST 동기 응답만으로 끝나므로, 그 경로에서는 Outbox→Kafka 파이프라인이 관여하지 않습니다. 다만 위에서 봤듯 응답을 못 받은 경우엔 이 파이프라인이 PENDING 주문을 뒤늦게 확정하는 데 직접 쓰입니다. 이와 별개로 알림 발송에도 이 파이프라인을 그대로 재사용했습니다 — 처음엔 구독하는 컨슈머가 하나도 없었는데, [notification-service](https://github.com/yoonxjoong/ecommerce-msa/tree/main/notification-service)를 추가로 만들어서 실제로 이어봤습니다. `payment-events`를 구독해서 결제 완료/실패에 따라 알림 로그를 남기는 역할만 하는 작은 컨슈머입니다.
 
 ```
 [알림] 주문 1 결제 완료 - 배송 준비 알림을 발송합니다.
@@ -372,14 +403,14 @@ public void publishPendingEvents() {
 - **API Gateway** (구현): 인증은 아직 없고, `POST /orders` Rate Limiting과 각 서비스로의 라우팅만 처리
 - **상품/카탈로그 서비스** (구현): 지금은 별도 서비스가 아니라 inventory-service에 포함 — 상품 조회, Redis Cache-Aside로 읽기 최적화
 - **재고 서비스** (구현): 재고 카운터 관리(Redis Lua 원자 연산), `product` 테이블(카탈로그+최초 시딩값)
-- **주문 서비스** (구현): 주문 생성/상태 관리, Saga 오케스트레이터 (REST 동기 호출). 장바구니는 두지 않아서 주문당 상품 1종만 지원
+- **주문 서비스** (구현): 주문 생성/상태 관리, Saga 오케스트레이터 (REST 동기 호출 + 응답을 못 받은 경우의 이벤트 기반 확정/타임아웃 안전망). 장바구니는 두지 않아서 주문당 상품 1종만 지원
 - **결제 서비스** (구현): mock 결제 승인, 결제 이벤트 발행 (Outbox + Message Relay)
 - **알림 서비스** (구현): Kafka `payment-events` 구독, 결제 완료/실패에 따른 알림 로그
 - **가상 대기열 서비스** (구현): 상품별 대기열 모드 토글, Redis Sorted Set 기반 순번 관리 + 1회용 입장 토큰 발급
 - **재고 재동기화 배치** (구현): Redis 재고 카운터를 주기적으로 Postgres에 되돌려 쓰는 배치 — 왜 필요한지는 바로 아래에서 설명합니다
 - **정산 서비스**: 판매 데이터 집계, 정산 처리 (설계만 함)
 
-서비스 간 통신은 **사용자 응답이 즉시 필요한 구간(상품 조회, 재고 확인, 결제 요청)은 동기 REST**로, **결과를 나중에 반영해도 되는 구간(알림, 정산)은 Kafka를 통한 비동기 이벤트**로 나누는 게 자연스러워 보입니다 — 다만 실제 구현에서는 Saga 보상 판단까지 동기 REST로 처리했다는 점은 앞서 말씀드린 그대로입니다.
+서비스 간 통신은 **사용자 응답이 즉시 필요한 구간(상품 조회, 재고 확인, 결제 요청)은 동기 REST**로, **결과를 나중에 반영해도 되는 구간(알림, 정산)은 Kafka를 통한 비동기 이벤트**로 나누는 게 자연스러워 보입니다. Saga 보상 판단도 기본적으로는 동기 REST 응답으로 끝나지만, 응답을 못 받은 경우만큼은 위에서 다룬 것처럼 비동기 이벤트 확정으로 넘어간다는 점이 예외입니다.
 
 ### 재고 재동기화 배치 — 실제로 만들면서 발견한 문제
 
@@ -406,11 +437,11 @@ Redis는 이 프로젝트에서 사실상 유일한 실시간 재고 소스입�
 
 - **트래픽 대응 중 CDN만 미구현** — 정적 자산이 없는 프로젝트라 적용할 대상 자체가 없습니다. 캐싱·Rate Limiting·가상 대기열은 구현·검증했습니다.
 - **장바구니를 아키텍처 범위에서 아예 뺐습니다.** 주문당 상품 1종만 지원해서, 여러 상품이 한 주문에 섞였을 때(일부는 재고 확보, 일부는 품절) 부분 실패를 어떻게 처리할지 같은 어려운 문제 자체를 피해갔습니다. 장바구니에 담아둔 시점과 결제 시점 사이 재고가 바뀌는 문제도 마찬가지로 다루지 않았습니다.
-- Circuit Breaker, 정산 서비스는 아직 구현하지 않았습니다.
+- 정산 서비스는 아직 구현하지 않았습니다. (Circuit Breaker는 이후 결제 서비스 호출에 실제로 붙였습니다 — 위 내용과 [별도 글](/posts/circuit-breaker-resilience4j/) 참고)
 - 가상 대기열을 비활성화(disable)하는 순간, 이미 대기 중이던 티켓들은 자동으로 입장 처리되지 않고 대기열에 그대로 남습니다 (다음에 다시 켜야 이어서 입장).
 - 실제 서비스들은 이 구조를 그대로 쓰기보다 트래픽 규모와 상품 특성(단일 SKU vs 옵션이 많은 상품)에 맞게 훨씬 단순화하거나 다르게 구성할 수도 있을 것 같습니다.
 
-다음엔 장바구니(여러 상품 주문)를 아키텍처에 다시 넣고 부분 실패 문제를 정면으로 풀어보거나, Circuit Breaker를 결제 서비스 호출에 실제로 붙여보고 싶습니다.
+다음엔 장바구니(여러 상품 주문)를 아키텍처에 다시 넣고 부분 실패 문제를 정면으로 풀어보고 싶습니다.
 
 ## 참고 자료
 
