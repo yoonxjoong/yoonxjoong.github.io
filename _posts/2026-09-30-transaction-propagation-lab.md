@@ -124,10 +124,13 @@ sequenceDiagram
 ## NESTED — 설정만으로는 활성화할 수 없다
 
 개념 정리 글에서는 JDBC savepoint를 지원해야 동작하며 JPA 환경에서는 제약이 있다고 정리했습니다.
-직접 검증하기 전에는 이를 설정으로 해결 가능한 제약으로 예상했지만, 실제로는 훨씬 근본적인
-제약이었습니다.
+직접 검증하기 전에는 이를 설정으로 해결 가능한 제약으로 예상했지만, 실제로는 설정이 아니라
+Hibernate 연동 구조 자체의 제약이었습니다.
 
-가장 먼저 시도한 방법은 다음과 같습니다.
+### 1. 시도한 방법 — nestedTransactionAllowed를 true로 설정
+
+`JpaTransactionManager`는 기본적으로 NESTED를 막아두고 있습니다. 이 플래그를 켜면 될 것으로
+예상했습니다.
 
 ```java
 @Bean
@@ -138,7 +141,9 @@ public PlatformTransactionManager nestedCapableTransactionManager(EntityManagerF
 }
 ```
 
-그러나 이 매니저로 `@Transactional(propagation = Propagation.NESTED)`를 실행해도 다음 예외가 그대로
+### 2. 결과 — 그래도 예외 발생
+
+이 매니저로 `@Transactional(propagation = Propagation.NESTED)`를 실행해도 다음 예외가 그대로
 발생합니다.
 
 ```
@@ -146,18 +151,30 @@ NestedTransactionNotSupportedException: JpaDialect does not support savepoints
 - check your JPA provider's capabilities
 ```
 
-원인은 spring-orm 6.1.13의 클래스 파일을 직접 분석해 확인했습니다. `JpaTransactionManager`가
-savepoint를 생성하려면, 트랜잭션 시작 시점에 `JpaDialect.beginTransaction()`이 반환하는 객체가
-스프링의 `SavepointManager` 인터페이스를 구현하고 있어야 합니다. 그런데
-`HibernateJpaDialect.beginTransaction()`은 `HibernateJpaDialect$SessionTransactionData`라는 객체를
-반환하며, 이 클래스는 `SavepointManager`를 구현하지 않습니다. 즉 **`nestedTransactionAllowed` 플래그는
-필요조건일 뿐 충분조건이 아니며, Hibernate 연동에는 애초에 savepoint 매니저를 생성하는 경로 자체가
-존재하지 않습니다.** 설정 변경만으로 해결할 문제가 아니라, JPA에서 NESTED를 실제로 사용하려면
-Hibernate 세션에서 JDBC 커넥션을 직접 꺼내 `SavepointManager`를 구현하는 커스텀 `JpaDialect`가
-필요합니다.
+### 3. 원인 분석 — Hibernate 연동에 savepoint 기능 자체가 없다
 
-이에 따라 NESTED가 실제로 동작하는 경로를 확인하기 위해 JPA 대신 순수 JDBC
-(`DataSourceTransactionManager` + `JdbcTemplate`)로 전환했습니다.
+spring-orm 6.1.13의 클래스 파일을 직접 분석해 원인을 확인했습니다. 스프링이 savepoint를 생성하려면
+다음 두 조건이 모두 필요합니다.
+
+- 조건 1: `nestedTransactionAllowed` 플래그가 true일 것
+- 조건 2: 트랜잭션을 시작할 때 JPA 쪽이 "savepoint를 만들 수 있는 객체"를 스프링에 넘겨줄 것
+
+조건 1은 방금 설정으로 충족했습니다. 문제는 조건 2입니다. `JpaTransactionManager`는 트랜잭션을 시작할
+때 `JpaDialect.beginTransaction()`이 반환하는 객체가 스프링의 `SavepointManager` 인터페이스를
+구현하고 있는지를 확인합니다. 그런데 Hibernate와 스프링을 연결하는
+`HibernateJpaDialect.beginTransaction()`은 `HibernateJpaDialect$SessionTransactionData`라는 객체를
+반환하고, 이 클래스는 `SavepointManager`를 구현하지 않습니다.
+
+즉 조건 1을 아무리 켜도 조건 2가 채워지지 않으면 savepoint는 만들어지지 않습니다. Hibernate
+연동에는 savepoint를 만들어주는 경로 자체가 없기 때문에, 이건 설정값 하나를 더 찾아서 바꾼다고
+해결되는 문제가 아니었습니다. 실제로 해결하려면 Hibernate 세션에서 JDBC 커넥션을 직접 꺼내
+`SavepointManager`를 구현하는 커스텀 `JpaDialect`를 만들어야 합니다.
+
+### 4. 해결 — JPA 대신 순수 JDBC로 전환
+
+NESTED가 실제로 동작하는 경로를 확인하기 위해, 이 부분만 JPA 대신 순수 JDBC
+(`DataSourceTransactionManager` + `JdbcTemplate`)로 전환했습니다. JDBC 커넥션은 스프링이 요구하는
+`SavepointManager` 조건을 이미 충족하고 있어서, 같은 방식이 그대로 동작합니다.
 
 ```java
 @Bean
@@ -195,12 +212,32 @@ public void saveItemWithCapableManager(String name, boolean fail) {
 }
 ```
 
-이 구성으로 두 가지를 확인했습니다.
+### 5. 샘플 코드 동작 방식
 
-1. `nested-bad-item`은 savepoint까지만 롤백되고, `nested-good-item`과 배치 전체(`runWithCapableManager`)는
-   정상 커밋됩니다.
-2. 같은 배치에서 `failFinalCommit=true`로 마무리 단계를 한 번 더 실패시키면, 이미 savepoint를 통과해
-   커밋된 것처럼 보였던 `nested-good-item`도 함께 사라집니다.
+`runWithCapableManager`는 바깥쪽(부모) 트랜잭션이고, REQUIRED로 실행됩니다.
+
+1. `nested-outer-capable` 행을 하나 insert합니다.
+2. `saveItemWithCapableManager("nested-bad-item", true)`를 호출합니다. 이 메서드는 NESTED로 실행되며,
+   `fail=true`이므로 insert 후 예외를 던집니다. NESTED이기 때문에 이 예외가 나면 이 메서드 안에서
+   실행한 insert 하나만 롤백되고, 바깥 트랜잭션은 영향을 받지 않습니다.
+3. 그 예외를 catch해서 흐름을 이어갑니다.
+4. `saveItemWithCapableManager("nested-good-item", false)`를 호출합니다. `fail=false`이므로 정상적으로
+   insert되고 끝납니다.
+5. `failFinalCommit`이 true면 여기서 다시 예외를 던집니다. 이번엔 NESTED가 아니라 바깥 트랜잭션 자체를
+   실패시키는 예외입니다.
+
+`saveItemWithCapableManager`는 NESTED로 실행되는 자식입니다. insert 한 줄과 조건부 예외로 구성됩니다.
+`fail=true`면 이 메서드가 시작되기 직전에 만들어둔 savepoint까지만 롤백되고, 바깥에는 영향을 주지
+않습니다.
+
+### 6. 검증 결과
+
+두 가지 입력값으로 이 코드를 실행해 확인했습니다.
+
+- `runWithCapableManager(false)` 호출 → `nested-outer-capable`과 `nested-good-item`은 DB에 남고,
+  `nested-bad-item`만 없습니다. 자기 자신의 savepoint까지만 롤백됐기 때문입니다.
+- `runWithCapableManager(true)` 호출 → 아무것도 남지 않습니다. `nested-good-item`은 분명 성공적으로
+  insert됐었지만, 5번 단계의 예외가 바깥 물리 트랜잭션 전체를 롤백시켜 함께 사라집니다.
 
 두 번째 결과가 핵심입니다. REQUIRES_NEW로 처리한 `AuditLog`는 부모가 이후 롤백되어도 살아남았지만,
 NESTED로 처리한 `nested-good-item`은 부모가 최종적으로 롤백되는 순간 함께 사라집니다. **NESTED는
