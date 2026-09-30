@@ -1,6 +1,6 @@
 ---
 title: "Spring 트랜잭션 전파 실습 검증 — REQUIRED, REQUIRES_NEW, NESTED, self-invocation"
-description: "@Transactional의 전파 옵션을 Spring Boot와 PostgreSQL로 구성한 실습 프로젝트에서 직접 검증한 기록입니다. REQUIRED와 REQUIRES_NEW는 pg_backend_pid()로 물리 커넥션 단위까지 확인했고, NESTED는 예상과 달리 JPA 환경에서는 설정만으로 활성화할 수 없다는 사실을 바이트코드 분석으로 확인했습니다. self-invocation은 예외 없이 트랜잭션 보호만 사라진다는 것도 실측으로 확인했습니다."
+description: "@Transactional의 전파 옵션을 Spring Boot와 MySQL로 구성한 실습 프로젝트에서 직접 검증한 기록입니다. REQUIRED와 REQUIRES_NEW는 connection_id()로 물리 커넥션 단위까지 확인했고, NESTED는 예상과 달리 JPA 환경에서는 설정만으로 활성화할 수 없다는 사실을 바이트코드 분석으로 확인했습니다. self-invocation은 예외 없이 트랜잭션 보호만 사라진다는 것도 실측으로 확인했습니다."
 author: yoonxjoong
 date: 2026-09-30 09:00:00 +0900
 categories:
@@ -14,7 +14,7 @@ mermaid: true
 
 [스프링 트랜잭션 개념 정리 글](/posts/spring-transaction-propagation-isolation/)에서 전파(Propagation)
 7가지를 정리하면서, 아직 직접 재현해서 확인한 내용은 없다고 밝힌 바 있습니다. 이번에는 Spring Boot와
-PostgreSQL로 실습 프로젝트를 구성해 직접 재현했으며, 예상과 다른 결과 두 가지를 확인했습니다.
+MySQL로 실습 프로젝트를 구성해 직접 재현했으며, 예상과 다른 결과 두 가지를 확인했습니다.
 
 실습 코드 전체는 [transaction-propagation-lab](https://github.com/yoonxjoong/transaction-propagation-lab)에서
 확인할 수 있습니다.
@@ -23,7 +23,7 @@ PostgreSQL로 실습 프로젝트를 구성해 직접 재현했으며, 예상과
 
 "REQUIRED는 참여하고 REQUIRES_NEW는 새로 시작한다"는 설명은 로그만으로는 쉽게 납득되지만, 이것이 실제로
 물리적인 DB 커넥션 수준에서 일어나는 일인지는 별도 확인이 필요합니다. 이를 위해 서비스 메서드마다
-`pg_backend_pid()`를 기록해, 부모와 자식이 같은 커넥션을 사용하는지를 값으로 비교했습니다.
+`connection_id()`를 기록해, 부모와 자식이 같은 커넥션을 사용하는지를 값으로 비교했습니다.
 
 ```java
 @Component
@@ -31,9 +31,9 @@ public class ConnectionIdProbe {
     @PersistenceContext
     private EntityManager entityManager;
 
-    public Integer currentBackendPid() {
-        Object result = entityManager.createNativeQuery("select pg_backend_pid()").getSingleResult();
-        return ((Number) result).intValue();
+    public Long currentConnectionId() {
+        Object result = entityManager.createNativeQuery("select connection_id()").getSingleResult();
+        return ((Number) result).longValue();
     }
 }
 ```
@@ -46,10 +46,10 @@ public class RequiredOrderService {
 
     @Transactional // REQUIRED (기본값)
     public void placeOrder(TxTrace trace, boolean failInInventory) {
-        trace.record("outer-before", probe.currentBackendPid());
+        trace.record("outer-before", probe.currentConnectionId());
         orderRepository.save(new Order("required-demo"));
         inventoryService.decreaseStock(trace, failInInventory);
-        trace.record("outer-after", probe.currentBackendPid());
+        trace.record("outer-after", probe.currentConnectionId());
     }
 }
 
@@ -58,7 +58,7 @@ public class InventoryService {
 
     @Transactional // REQUIRED (기본값)
     public void decreaseStock(TxTrace trace, boolean fail) {
-        trace.record("inner-required", probe.currentBackendPid());
+        trace.record("inner-required", probe.currentConnectionId());
         if (fail) {
             throw new IllegalStateException("재고 부족");
         }
@@ -67,8 +67,8 @@ public class InventoryService {
 ```
 
 `decreaseStock`에서 예외가 발생하면 `placeOrder`의 `Order` insert까지 전부 롤백됩니다.
-`outer-before`, `inner-required`, `outer-after` 세 시점의 pid는 모두 동일했습니다 — REQUIRED가 같은
-물리 커넥션과 트랜잭션을 공유한다는 설명이 실제 동작과 일치함을 확인했습니다.
+`outer-before`, `inner-required`, `outer-after` 세 시점의 커넥션 ID는 모두 동일했습니다 — REQUIRED가
+같은 물리 커넥션과 트랜잭션을 공유한다는 설명이 실제 동작과 일치함을 확인했습니다.
 
 ## REQUIRES_NEW — 부모가 롤백돼도 자식은 이미 커밋된 채로 남음
 
@@ -78,10 +78,10 @@ public class RequiresNewOrderService {
 
     @Transactional // REQUIRED
     public void placeOrder(TxTrace trace, boolean failAfterAudit) {
-        trace.record("outer-before", probe.currentBackendPid());
+        trace.record("outer-before", probe.currentConnectionId());
         orderRepository.save(new Order("requires-new-demo"));
         auditLogService.record(trace, "placeOrder attempted"); // REQUIRES_NEW
-        trace.record("outer-after", probe.currentBackendPid());
+        trace.record("outer-after", probe.currentConnectionId());
         if (failAfterAudit) {
             throw new IllegalStateException("주문 처리 중 실패");
         }
@@ -93,7 +93,7 @@ public class AuditLogService {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void record(TxTrace trace, String message) {
-        trace.record("inner-requires-new", probe.currentBackendPid());
+        trace.record("inner-requires-new", probe.currentConnectionId());
         auditLogRepository.save(new AuditLog(message));
     }
 }
@@ -102,24 +102,24 @@ public class AuditLogService {
 ```mermaid
 sequenceDiagram
     participant Test
-    participant TxA as placeOrder (Tx-A, pid=A)
-    participant TxB as record (Tx-B, REQUIRES_NEW, pid=B)
+    participant TxA as placeOrder (Tx-A, connection=A)
+    participant TxB as record (Tx-B, REQUIRES_NEW, connection=B)
     participant DB
 
     Test->>TxA: placeOrder(failAfterAudit=true)
-    TxA->>DB: BEGIN (pid A)
+    TxA->>DB: BEGIN (connection A)
     TxA->>TxB: record() 호출
-    TxB->>DB: Tx-A suspend, BEGIN Tx-B (pid B, A와 다름)
+    TxB->>DB: Tx-A suspend, BEGIN Tx-B (connection B, A와 다름)
     TxB->>DB: COMMIT Tx-B — AuditLog 즉시 확정
-    TxB->>TxA: Tx-A resume (pid A로 복귀)
+    TxB->>TxA: Tx-A resume (connection A로 복귀)
     TxA->>DB: ROLLBACK Tx-A — Order는 사라짐
     Note over DB: AuditLog는 이미 커밋되어 그대로 남아있음
 ```
 
 `placeOrder(failAfterAudit=true)`를 호출하면 `Order`는 롤백되지만 `AuditLog`는 그대로 남습니다.
-`outer-before`와 `inner-requires-new`의 pid는 서로 달랐고(별도 물리 커넥션), 자식 호출이 끝난 뒤
-`outer-after`는 다시 `outer-before`와 같은 pid로 돌아왔습니다. 기존 트랜잭션을 suspend하고 새로
-시작한다는 설명이 실제 커넥션 수준에서도 그대로 일어난다는 것을 확인했습니다.
+`outer-before`와 `inner-requires-new`의 커넥션 ID는 서로 달랐고(별도 물리 커넥션), 자식 호출이 끝난
+뒤 `outer-after`는 다시 `outer-before`와 같은 커넥션 ID로 돌아왔습니다. 기존 트랜잭션을 suspend하고
+새로 시작한다는 설명이 실제 커넥션 수준에서도 그대로 일어난다는 것을 확인했습니다.
 
 ## NESTED — 설정만으로는 활성화할 수 없다
 
@@ -207,6 +207,9 @@ NESTED로 처리한 `nested-good-item`은 부모가 최종적으로 롤백되는
 물리적으로 부모와 동일한 트랜잭션 안에서 savepoint만 생성하는 반면, REQUIRES_NEW는 별도의 물리
 트랜잭션이라는 차이가 최종 결과에 그대로 드러납니다.**
 
+참고로 MySQL에서 이 실험을 재현할 때는 InnoDB 스토리지 엔진(기본값)인지만 확인하면 됩니다 —
+savepoint는 InnoDB에서만 지원되고, MyISAM은 트랜잭션 자체를 지원하지 않습니다.
+
 ## self-invocation — 예외 없이 조용히 트랜잭션 보호만 사라짐
 
 같은 클래스 안에서 `this.method()`로 호출하면 프록시를 거치지 않아 `@Transactional`이 무시된다는 것은
@@ -259,8 +262,8 @@ exception(`IOException`)을 던져도 `Order`가 그대로 커밋되며, `rollba
 
 | 항목 | 예상 | 실제 확인 결과 |
 | --- | --- | --- |
-| REQUIRED | 부모/자식이 같은 트랜잭션 공유 | pid 동일 — 확인됨 |
-| REQUIRES_NEW | 별도 물리 트랜잭션, 부모 롤백과 무관 | pid 다름, 부모 롤백돼도 자식 생존 — 확인됨 |
+| REQUIRED | 부모/자식이 같은 트랜잭션 공유 | 커넥션 ID 동일 — 확인됨 |
+| REQUIRES_NEW | 별도 물리 트랜잭션, 부모 롤백과 무관 | 커넥션 ID 다름, 부모 롤백돼도 자식 생존 — 확인됨 |
 | NESTED (JPA) | 설정만 손보면 될 것 | HibernateJpaDialect 구조상 원천적으로 불가능 |
 | NESTED (JDBC) | savepoint까지만 롤백 | 확인됨 + 부모 최종 롤백 시 NESTED 자식도 함께 사라짐 |
 | self-invocation | @Transactional 무시됨 | 확인됨 — 예외 없이 저장까지 완료됨 |

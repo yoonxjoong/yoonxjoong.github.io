@@ -210,11 +210,11 @@ public class OrderService {
 | rollbackFor | unchecked만 기본 롤백 — checked는 명시해야 함 |
 | 프록시 기반 | 외부 호출만 가로채짐 — 내부 호출(self-invocation)은 무시됨 |
 
-여기까지가 개념 정리이고, 전파(Propagation) 부분은 이후 Spring Boot와 PostgreSQL로 구성한 실습
-프로젝트에서 직접 재현해 검증했습니다. REQUIRED와 REQUIRES_NEW는 `pg_backend_pid()`로 물리 커넥션
-단위까지 확인했고, NESTED는 예상과 달리 `JpaTransactionManager`에서는 설정만으로 활성화할 수 없다는
-사실도(HibernateJpaDialect가 SavepointManager를 구현하지 않음) 바이트코드 분석으로 확인했습니다 —
-자세한 내용은 [트랜잭션 전파 실습 랩](/posts/transaction-propagation-lab/) 글에 정리했습니다.
+여기까지가 개념 정리이고, 전파(Propagation) 부분은 이후 Spring Boot와 MySQL로 구성한 실습 프로젝트에서
+직접 재현해 검증했습니다. REQUIRED와 REQUIRES_NEW는 `connection_id()`로 물리 커넥션 단위까지
+확인했고, NESTED는 예상과 달리 `JpaTransactionManager`에서는 설정만으로 활성화할 수 없다는 사실도
+(HibernateJpaDialect가 SavepointManager를 구현하지 않음) 바이트코드 분석으로 확인했습니다 — 자세한
+내용은 [트랜잭션 전파 실습 랩](/posts/transaction-propagation-lab/) 글에 정리했습니다.
 
 [비관락/낙관락/Redis 분산락 비교](/posts/pessimistic-optimistic-redis-lock-comparison/) 글과도 맞닿아 있는 부분이라, 로컬 트랜잭션 경계를 확실히 정리해두면 다음에 동시성/분산 트랜잭션 쪽을 다시 볼 때 헷갈림이 줄어들 것 같습니다.
 
