@@ -142,6 +142,7 @@ pwa:
     # shares the same domain name as the current website.
     deny_paths:
       # - "/example"  # URLs match `<SITE_URL>/example/*` will not be cached by the PWA
+      - "/product-order-service" # product-order-service API 문서 (프로젝트 GitHub Pages)
 
 paginate: 10
 
